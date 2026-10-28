@@ -46,6 +46,10 @@ public enum Stats {
         return DateInterval(start: start, end: end)
     }
 
+    public static func week(containing date: Date, calendar: Calendar) -> DateInterval {
+        calendar.dateInterval(of: .weekOfYear, for: date) ?? day(containing: date, calendar: calendar)
+    }
+
     /// The last `days` days ending with the day that contains `date`.
     public static func lastDays(_ days: Int, endingOn date: Date, calendar: Calendar) -> DateInterval {
         let today = day(containing: date, calendar: calendar)

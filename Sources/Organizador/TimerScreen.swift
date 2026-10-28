@@ -168,11 +168,13 @@ struct ActivityEditor: View {
     let activity: Activity?
     @State private var name: String
     @State private var colorHex: String
+    @State private var goalID: UUID?
 
     init(activity: Activity?) {
         self.activity = activity
         _name = State(initialValue: activity?.name ?? "")
         _colorHex = State(initialValue: activity?.colorHex ?? Palette.colors[3])
+        _goalID = State(initialValue: activity?.goalID)
     }
 
     var body: some View {
@@ -187,6 +189,12 @@ struct ActivityEditor: View {
                         .frame(width: 24, height: 24)
                         .overlay(Circle().stroke(Color.primary, lineWidth: hex == colorHex ? 2 : 0))
                         .onTapGesture { colorHex = hex }
+                }
+            }
+            Picker("Conta para a meta", selection: $goalID) {
+                Text("Nenhuma").tag(UUID?.none)
+                ForEach(model.sortedGoals) { goal in
+                    Text(goal.title).tag(Optional(goal.id))
                 }
             }
             HStack {
@@ -208,9 +216,10 @@ struct ActivityEditor: View {
         if var activity {
             activity.name = trimmedName
             activity.colorHex = colorHex
+            activity.goalID = goalID
             model.updateActivity(activity)
         } else {
-            model.addActivity(name: trimmedName, colorHex: colorHex)
+            model.addActivity(name: trimmedName, colorHex: colorHex, goalID: goalID)
         }
         dismiss()
     }
