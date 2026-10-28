@@ -86,14 +86,22 @@ public struct Preferences: Codable, Hashable, Sendable {
     public var idlePauseMinutes: Int
     /// Private iCal address of the calendar to show (Google Calendar's "secret address"). Empty when not set.
     public var calendarURL: String
+    /// Folder with the notes' `.md` files. Empty means the default folder next to the data file.
+    public var notesFolderPath: String
 
-    public init(dailyTargetMinutes: Int = 240, idlePauseMinutes: Int = 10, calendarURL: String = "") {
+    public init(
+        dailyTargetMinutes: Int = 240,
+        idlePauseMinutes: Int = 10,
+        calendarURL: String = "",
+        notesFolderPath: String = ""
+    ) {
         self.dailyTargetMinutes = dailyTargetMinutes
         self.idlePauseMinutes = idlePauseMinutes
         self.calendarURL = calendarURL
+        self.notesFolderPath = notesFolderPath
     }
 
-    private enum CodingKeys: String, CodingKey { case dailyTargetMinutes, idlePauseMinutes, calendarURL }
+    private enum CodingKeys: String, CodingKey { case dailyTargetMinutes, idlePauseMinutes, calendarURL, notesFolderPath }
 
     // Missing keys fall back to defaults, so files from older versions keep loading.
     public init(from decoder: Decoder) throws {
@@ -104,7 +112,9 @@ public struct Preferences: Codable, Hashable, Sendable {
                 ?? defaults.dailyTargetMinutes,
             idlePauseMinutes: try container.decodeIfPresent(Int.self, forKey: .idlePauseMinutes)
                 ?? defaults.idlePauseMinutes,
-            calendarURL: try container.decodeIfPresent(String.self, forKey: .calendarURL) ?? defaults.calendarURL
+            calendarURL: try container.decodeIfPresent(String.self, forKey: .calendarURL) ?? defaults.calendarURL,
+            notesFolderPath: try container.decodeIfPresent(String.self, forKey: .notesFolderPath)
+                ?? defaults.notesFolderPath
         )
     }
 }

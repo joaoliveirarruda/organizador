@@ -572,3 +572,103 @@ final class FinanceTests: XCTestCase {
         XCTAssertEqual(again.duplicates, 2)
     }
 }
+
+final class NotesTests: XCTestCase {
+    var folder: URL!
+
+    override func setUpWithError() throws {
+        folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    func kinds(_ text: String) -> [MarkdownSpan.Kind] {
+        MarkdownSpans.parse(text).map(\.kind).filter { $0 != .marker }
+    }
+
+    func testWikiLinkTargets() {
+        let text = "Ver [[Inglês]], [[Plano#Semana 1]] e [[Leitura|livros]]. De novo [[inglês]]. Vazio [[ ]]."
+        XCTAssertEqual(WikiLinks.targets(in: text), ["Inglês", "Plano", "Leitura"])
+    }
+
+    func testRewriteKeepsSectionAndAlias() {
+        let text = "[[Plano]] [[plano#Meta|aqui]] [[Planos]]"
+        XCTAssertEqual(WikiLinks.rewrite(text, from: "Plano", to: "Roteiro"), "[[Roteiro]] [[Roteiro#Meta|aqui]] [[Planos]]")
+    }
+
+    func testStoreCreatesRenamesAndRewritesLinks() throws {
+        let store = NoteStore(folder: folder)
+        let plan = try store.create(title: "Plano")
+        let second = try store.create(title: "Plano")
+        XCTAssertEqual(second.title, "Plano 2")
+        var diary = try store.create(title: "Diário: dia/1")
+        XCTAssertEqual(diary.title, "Diário- dia-1")
+        diary.body = "Hoje segui o [[Plano|plano]]."
+        try store.save(diary)
+
+        let renamed = try store.rename(plan, to: "Roteiro")
+        XCTAssertEqual(renamed.title, "Roteiro")
+        XCTAssertThrowsError(try store.rename(renamed, to: "Plano 2")) { error in
+            XCTAssertEqual(error as? NoteError, .alreadyExists("Plano 2"))
+        }
+        let notes = try store.list()
+        XCTAssertEqual(Set(notes.map(\.title)), ["Roteiro", "Plano 2", "Diário- dia-1"])
+        XCTAssertEqual(notes.first { $0.title == "Diário- dia-1" }?.body, "Hoje segui o [[Roteiro|plano]].")
+
+        let caseOnly = try store.rename(renamed, to: "roteiro")
+        XCTAssertEqual(try store.list().filter { $0.title.lowercased() == "roteiro" }.map(\.title), [caseOnly.title])
+    }
+
+    func testMarkdownBlocks() {
+        let text = "# Título\n- [x] feito\n- [ ] fazer\n1. item\n> citação\n---\n```\n**não**\n```\n"
+        XCTAssertEqual(kinds(text), [
+            .heading(1), .checkbox(checked: true), .strikethrough, .checkbox(checked: false),
+            .listItem, .quote, .rule, .codeBlock,
+        ])
+    }
+
+    func testMarkdownInline() {
+        let text = "**negrito** e *itálico* e `**código**` e [[Nota|apelido]] e [site](https://a.com)"
+        let spans = MarkdownSpans.parse(text)
+        XCTAssertEqual(spans.map(\.kind).filter { $0 != .marker }, [
+            .code, .wikiLink("Nota"), .link("https://a.com"), .bold, .italic,
+        ])
+        let wiki = spans.first { $0.kind == .wikiLink("Nota") }!
+        let hidden = spans.filter { $0.kind == .marker && NSIntersectionRange($0.range, wiki.range).length > 0 }
+        XCTAssertEqual(hidden.map { (text as NSString).substring(with: $0.range) }, ["[[Nota|", "]]"])
+    }
+
+    func testGraphLinksNotesGoalsAndTasks() throws {
+        let store = NoteStore(folder: folder)
+        var a = try store.create(title: "A")
+        _ = try store.create(title: "B")
+        let ingles = try store.create(title: "Inglês")
+        a.body = "[[B]] [[Inglês]] [[Ler 30 min]] [[Fantasma]] [[A]]"
+        var b = try store.list().first { $0.title == "B" }!
+        b.body = "Volta para [[A]]"
+        let goal = Goal(title: "inglês")
+        let task = TaskItem(title: "Ler 30 min")
+        let notes = [a, b, ingles]
+
+        let graph = NoteGraph.build(notes: notes, goals: [goal], tasks: [task])
+        XCTAssertEqual(graph.nodes.map(\.title), ["A", "B", "Inglês", "Ler 30 min"])
+        XCTAssertEqual(graph.nodes[3].ref, .task(task.id))
+        XCTAssertEqual(graph.edges, [GraphEdge(from: 0, to: 1), GraphEdge(from: 0, to: 2), GraphEdge(from: 0, to: 3)])
+        XCTAssertEqual(NoteGraph.backlinks(to: "b", in: notes).map(\.title), ["A"])
+    }
+
+    func testForceLayoutPullsLinkedNodesTogether() {
+        var layout = ForceLayout(count: 4)
+        let edges = [GraphEdge(from: 0, to: 1)]
+        for _ in 0..<400 { layout.step(edges: edges) }
+        func distance(_ i: Int, _ j: Int) -> Double {
+            let d = layout.positions[i] - layout.positions[j]
+            return (d * d).sum().squareRoot()
+        }
+        XCTAssertTrue(layout.positions.allSatisfy { $0.x.isFinite && $0.y.isFinite })
+        XCTAssertLessThan(distance(0, 1), distance(2, 3))
+        XCTAssertLessThan(layout.step(edges: edges), 1)
+    }
+}
