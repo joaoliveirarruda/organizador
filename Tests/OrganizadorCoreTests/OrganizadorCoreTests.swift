@@ -717,3 +717,44 @@ final class SchemaV2Tests: XCTestCase {
         XCTAssertEqual(try JSONStore.makeDecoder().decode(AppData.self, from: encoded), data)
     }
 }
+
+final class FrontMatterTests: XCTestCase {
+    func testNoteWithoutBlock() {
+        let (meta, body) = FrontMatter.parse("# Oi\n---\ntexto")
+        XCTAssertEqual(meta, FrontMatter())
+        XCTAssertEqual(body, "# Oi\n---\ntexto")
+        XCTAssertEqual(meta.render(body), "# Oi\n---\ntexto")
+    }
+
+    func testReadsIconAndCoverAndKeepsUnknownKeys() {
+        let text = "---\ntags:\n  - estudo\nicon: 📚\ncover: \"anexos/capa.jpg\"\naliases: [CS]\n---\nCorpo\n"
+        let (meta, body) = FrontMatter.parse(text)
+        XCTAssertEqual(meta.icon, .emoji("📚"))
+        XCTAssertEqual(meta.cover, "anexos/capa.jpg")
+        XCTAssertEqual(body, "Corpo\n")
+        XCTAssertEqual(meta.render(body), "---\ntags:\n  - estudo\nicon: 📚\ncover: anexos/capa.jpg\naliases: [CS]\n---\nCorpo\n")
+    }
+
+    func testImageIcon() {
+        XCTAssertEqual(FrontMatter.parse("---\nicon: anexos/eu.png\n---\n").0.icon, .image("anexos/eu.png"))
+    }
+
+    func testChangingIconPreservesBodyAndOtherKeys() {
+        var (meta, body) = FrontMatter.parse("---\ntags: x\nicon: 📚\n---\nCorpo")
+        meta.icon = .emoji("🧠")
+        meta.cover = "anexos/c.png"
+        XCTAssertEqual(meta.render(body), "---\ntags: x\nicon: 🧠\ncover: anexos/c.png\n---\nCorpo")
+        meta.icon = nil
+        meta.cover = nil
+        XCTAssertEqual(meta.render(body), "---\ntags: x\n---\nCorpo")
+        (meta, body) = FrontMatter.parse("Só corpo")
+        meta.icon = .emoji("✅")
+        XCTAssertEqual(meta.render(body), "---\nicon: ✅\n---\nSó corpo")
+    }
+
+    func testRoundTripIsLossless() {
+        let text = "---\ntitle: \"A: B\"\nicon: 🎯\n---\n\n# Nota\n"
+        let (meta, body) = FrontMatter.parse(text)
+        XCTAssertEqual(meta.render(body), text)
+    }
+}
