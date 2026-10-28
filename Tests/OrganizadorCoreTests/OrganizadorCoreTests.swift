@@ -758,3 +758,131 @@ final class FrontMatterTests: XCTestCase {
         XCTAssertEqual(meta.render(body), text)
     }
 }
+
+final class GoalThreadsTests: XCTestCase {
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.firstWeekday = 2
+        return calendar
+    }()
+    let folder = URL(fileURLWithPath: "/tmp/notas")
+
+    /// October 2026; the 28th is a Wednesday.
+    func date(_ day: Int, _ hour: Int = 12) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour))!
+    }
+
+    func note(_ title: String, _ body: String, modified: Date) -> Note {
+        Note(url: folder.appendingPathComponent(title + ".md"), body: body, modifiedAt: modified)
+    }
+
+    func thread(_ goal: Goal, _ data: AppData, notes: [Note] = [], now: Date) -> GoalThread {
+        var data = data
+        if !data.goals.contains(where: { $0.id == goal.id }) { data.goals.append(goal) }
+        return GoalThreads.compute(data: data, notes: notes, now: now, calendar: calendar).first { $0.goal.id == goal.id }!
+    }
+
+    func testNewGoalCountsFromItsStartDate() {
+        let goal = Goal(title: "CS229", startDate: date(20))
+        XCTAssertEqual(thread(goal, AppData(), now: date(26)).state, .active)
+        let stalled = thread(goal, AppData(), now: date(27))
+        XCTAssertEqual(stalled.state, .stalled)
+        XCTAssertEqual(stalled.idleDays, 7)
+        XCTAssertEqual(stalled.lastTouched, date(20))
+    }
+
+    func testSessionOnGoalAreaTouchesIt() {
+        let goal = Goal(title: "CS229", startDate: date(1))
+        let area = Activity(name: "Aulas", colorHex: "#000000", goalID: goal.id)
+        let loose = Activity(name: "E-mails", colorHex: "#000000")
+        let data = AppData(activities: [area, loose], sessions: [
+            FocusSession(activityID: area.id, start: date(22, 9), end: date(22, 10)),
+            FocusSession(activityID: loose.id, start: date(27, 9), end: date(27, 10)),
+        ])
+        let result = thread(goal, data, now: date(28))
+        XCTAssertEqual(result.lastTouched, date(22, 10))
+        XCTAssertEqual(result.idleDays, 6)
+        XCTAssertEqual(result.state, .active)
+        XCTAssertEqual(result.lastSession?.end, date(22, 10))
+        XCTAssertEqual(thread(goal, data, now: date(29)).state, .stalled)
+    }
+
+    func testRunningTimerCountsAsTouchedNow() {
+        let goal = Goal(title: "CS229", startDate: date(1))
+        let area = Activity(name: "Aulas", colorHex: "#000000", goalID: goal.id)
+        let data = AppData(activities: [area], running: RunningTimer(activityID: area.id, startedAt: date(28, 11)))
+        let result = thread(goal, data, now: date(28, 12))
+        XCTAssertEqual(result.lastTouched, date(28, 12))
+        XCTAssertEqual(result.state, .active)
+        XCTAssertEqual(result.weekSeconds, 3600)
+    }
+
+    func testLinkedNoteAndCompletedTaskTouchIt() {
+        let goal = Goal(title: "CS229", startDate: date(1))
+        let notes = [
+            note("Aula 3", "Revisar [[cs229]] amanhã", modified: date(24)),
+            note("Outra", "nada a ver", modified: date(27)),
+        ]
+        var result = thread(goal, AppData(), notes: notes, now: date(28))
+        XCTAssertEqual(result.lastTouched, date(24))
+        XCTAssertEqual(result.lastNote?.title, "Aula 3")
+
+        let task = TaskItem(title: "Lista 1", goalID: goal.id, completedAt: date(26))
+        result = thread(goal, AppData(tasks: [task]), notes: notes, now: date(28))
+        XCTAssertEqual(result.lastTouched, date(26))
+    }
+
+    func testPausedAndClosedNeverStall() {
+        for status in [GoalStatus.paused, .closed] {
+            let goal = Goal(title: "CS229", startDate: date(1), status: status)
+            let result = thread(goal, AppData(), now: date(28))
+            XCTAssertEqual(result.state, status == .paused ? .paused : .closed)
+        }
+    }
+
+    func testCustomLimit() {
+        let goal = Goal(title: "Treino", startDate: date(25), staleDays: 2)
+        XCTAssertEqual(thread(goal, AppData(), now: date(27)).state, .stalled)
+    }
+
+    func testWeekHoursAndIntendedPace() {
+        let goal = Goal(title: "OAB", startDate: date(1), weeklyHours: 6)
+        let area = Activity(name: "Penal", colorHex: "#000000", goalID: goal.id)
+        let data = AppData(activities: [area], sessions: [
+            FocusSession(activityID: area.id, start: date(25, 9), end: date(25, 11)),  // Sunday: last week
+            FocusSession(activityID: area.id, start: date(26, 9), end: date(26, 11)),  // Monday
+        ])
+        let result = thread(goal, data, now: date(28))
+        XCTAssertEqual(result.weekSeconds, 2 * 3600)
+        XCTAssertEqual(result.weeklyTargetSeconds, 6 * 3600)
+    }
+
+    func testNextOpenTask() {
+        let goal = Goal(title: "OAB", startDate: date(1))
+        let tasks = [
+            TaskItem(title: "Feita", goalID: goal.id, completedAt: date(20)),
+            TaskItem(title: "Sem prazo", goalID: goal.id),
+            TaskItem(title: "Amanhã", dueDate: date(29, 0), goalID: goal.id),
+            TaskItem(title: "De outro", dueDate: date(28, 0)),
+        ]
+        XCTAssertEqual(thread(goal, AppData(tasks: tasks), now: date(28)).nextTask?.title, "Amanhã")
+    }
+
+    func testNoticeIsNilWithoutStalledGoals() {
+        let goal = Goal(title: "CS229", startDate: date(27))
+        let paused = Goal(title: "Piano", startDate: date(1), status: .paused)
+        let threads = GoalThreads.compute(data: AppData(goals: [goal, paused]), notes: [], now: date(28), calendar: calendar)
+        XCTAssertNil(GoalThreads.notice(threads))
+    }
+
+    func testNoticeJoinsStalledGoals() {
+        let one = [Goal(title: "CS229", startDate: date(19))]
+        var threads = GoalThreads.compute(data: AppData(goals: one), notes: [], now: date(28), calendar: calendar)
+        XCTAssertEqual(GoalThreads.notice(threads), "CS229 está parado há 9 dias.")
+
+        let goals = one + [Goal(title: "OAB", startDate: date(21)), Goal(title: "Inglês", startDate: date(10)), Goal(title: "Novo", startDate: date(28))]
+        threads = GoalThreads.compute(data: AppData(goals: goals), notes: [], now: date(28), calendar: calendar)
+        XCTAssertEqual(GoalThreads.notice(threads), "3 frentes paradas: Inglês (18 dias), CS229 (9 dias) e OAB (7 dias).")
+    }
+}
