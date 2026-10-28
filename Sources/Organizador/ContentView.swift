@@ -22,8 +22,8 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Theme.page)
                 .foregroundStyle(Theme.text)
-                .toolbarBackground(Theme.page, for: .windowToolbar)
-                .toolbarBackground(.visible, for: .windowToolbar)
+                // A clear toolbar lets each column's own color reach the top of the window.
+                .toolbarBackground(.hidden, for: .windowToolbar)
         }
         .onReceive(NotificationCenter.default.publisher(for: StaleNotifier.openHome)) { _ in model.route = .home }
         .preferredColorScheme(.dark)
