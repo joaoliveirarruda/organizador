@@ -347,6 +347,7 @@ public struct NoteGraph: Sendable {
     }
 
     /// Every note is a node; goals and tasks only when some note links to them. Links to nothing are left out.
+    /// Edges have no direction: A → B and B → A are one edge.
     public static func build(notes: [Note], goals: [Goal], tasks: [TaskItem]) -> NoteGraph {
         var nodes = notes.map { GraphNode(ref: .note($0.url), title: $0.title) }
         var index = Dictionary(uniqueKeysWithValues: nodes.enumerated().map { ($1.ref, $0) })
@@ -359,7 +360,7 @@ public struct NoteGraph: Sendable {
                     index[node.ref] = nodes.count - 1
                     return nodes.count - 1
                 }()
-                if to != from { edges.insert(GraphEdge(from: from, to: to)) }
+                if to != from { edges.insert(GraphEdge(from: min(from, to), to: max(from, to))) }
             }
         }
         return NoteGraph(nodes: nodes, edges: edges.sorted { ($0.from, $0.to) < ($1.from, $1.to) })

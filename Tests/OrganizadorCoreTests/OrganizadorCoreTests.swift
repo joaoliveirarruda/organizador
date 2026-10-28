@@ -646,9 +646,11 @@ final class NotesTests: XCTestCase {
         _ = try store.create(title: "B")
         let ingles = try store.create(title: "Inglês")
         a.body = "[[B]] [[Inglês]] [[Ler 30 min]] [[Fantasma]] [[A]]"
+        var b = try store.list().first { $0.title == "B" }!
+        b.body = "Volta para [[A]]"
         let goal = Goal(title: "inglês")
         let task = TaskItem(title: "Ler 30 min")
-        let notes = [a, try store.list().first { $0.title == "B" }!, ingles]
+        let notes = [a, b, ingles]
 
         let graph = NoteGraph.build(notes: notes, goals: [goal], tasks: [task])
         XCTAssertEqual(graph.nodes.map(\.title), ["A", "B", "Inglês", "Ler 30 min"])

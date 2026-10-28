@@ -12,7 +12,10 @@ enum NotePDF {
         panel.allowedContentTypes = [.pdf]
         panel.nameFieldStringValue = note.title + ".pdf"
         guard panel.runModal() == .OK, let url = panel.url else { return false }
+        return write(note, to: url)
+    }
 
+    static func write(_ note: Note, to url: URL) -> Bool {
         let printInfo = NSPrintInfo(dictionary: [.jobSavingURL: url])
         printInfo.jobDisposition = .save
         printInfo.paperSize = NSSize(width: 595, height: 842)
@@ -48,7 +51,7 @@ enum NotePDF {
             switch span.kind {
             case .marker: return (span.range, "")
             case .checkbox(let checked): return (span.range, checked ? "☑ " : "☐ ")
-            case .rule: return (span.range, String(repeating: "─", count: 40))
+            case .rule: return (span.range, String(repeating: "─", count: 28))
             case .listItem:
                 let marker = text.attributedSubstring(from: span.range).string
                 return "-*+".contains(marker.prefix(1)) ? (span.range, "• ") : nil
