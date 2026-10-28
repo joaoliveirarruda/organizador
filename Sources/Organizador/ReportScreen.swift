@@ -14,8 +14,8 @@ struct ReportScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom) {
                     ScreenHeading(
-                        section: "Relatório",
-                        title: "Seu tempo",
+                        section: "Tempo",
+                        title: "Relatório",
                         subtitle: report.interval.map { "\(label($0)) · \(DurationFormat.compact(total))" } ?? "Nenhum tempo registrado ainda"
                     )
                     Spacer()
@@ -55,6 +55,7 @@ struct ReportScreen: View {
             .frame(maxWidth: 888, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .toolbar { ToolbarItem(placement: .principal) { TimeTabs() } }
     }
 
     private static let months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
