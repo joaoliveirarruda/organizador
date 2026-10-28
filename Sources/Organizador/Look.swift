@@ -104,6 +104,7 @@ struct PageHeader<Title: View>: View {
     @State private var hovering = false
     @State private var editingEmoji = false
     @State private var emoji = ""
+    @FocusState private var emojiFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -132,6 +133,7 @@ struct PageHeader<Title: View>: View {
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
                     .fixedSize()
+                    .popover(isPresented: $editingEmoji, arrowEdge: .bottom) { emojiPicker }
                     .offset(y: cover == nil ? 0 : -32)
                     .padding(.bottom, cover == nil ? 0 : -32)
                 }
@@ -139,6 +141,7 @@ struct PageHeader<Title: View>: View {
                     if icon == nil {
                         Menu("Adicionar ícone") { iconMenu }
                             .menuStyle(.borderlessButton).fixedSize()
+                            .popover(isPresented: $editingEmoji, arrowEdge: .bottom) { emojiPicker }
                     }
                     if cover == nil {
                         Button("Adicionar capa") { pickCover() }
@@ -154,23 +157,28 @@ struct PageHeader<Title: View>: View {
             .padding(.top, cover == nil ? 32 : 12)
         }
         .onHover { hovering = $0 }
-        .popover(isPresented: $editingEmoji) {
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("Emoji", text: $emoji)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 160)
-                    .onSubmit(commitEmoji)
-                Text("⌃⌘Espaço abre os emojis do Mac.").font(.caption).foregroundStyle(.secondary)
-                Button("Usar") { commitEmoji() }.keyboardShortcut(.defaultAction)
-            }
+    }
+
+    /// A field that opens the Mac emoji picker right away; picking one sets it as the icon.
+    private var emojiPicker: some View {
+        TextField("Emoji", text: $emoji)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 120)
+            .focused($emojiFocused)
+            .onSubmit(commitEmoji)
+            .onChange(of: emoji) { if !emoji.isEmpty { commitEmoji() } }
             .padding(12)
-        }
+            .onAppear {
+                emojiFocused = true
+                // The picker types into whatever has focus, so wait for the field to take it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { NSApp.orderFrontCharacterPalette(nil) }
+            }
     }
 
     @ViewBuilder
     private var iconMenu: some View {
         Button("Emoji…") {
-            if case .emoji(let current) = icon { emoji = current } else { emoji = "" }
+            emoji = ""
             editingEmoji = true
         }
         Button("Foto…") {
