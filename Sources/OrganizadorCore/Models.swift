@@ -84,13 +84,16 @@ public struct Preferences: Codable, Hashable, Sendable {
     public var dailyTargetMinutes: Int
     /// Pause the timer after this many minutes without keyboard or mouse input. 0 disables it.
     public var idlePauseMinutes: Int
+    /// Private iCal address of the calendar to show (Google Calendar's "secret address"). Empty when not set.
+    public var calendarURL: String
 
-    public init(dailyTargetMinutes: Int = 240, idlePauseMinutes: Int = 10) {
+    public init(dailyTargetMinutes: Int = 240, idlePauseMinutes: Int = 10, calendarURL: String = "") {
         self.dailyTargetMinutes = dailyTargetMinutes
         self.idlePauseMinutes = idlePauseMinutes
+        self.calendarURL = calendarURL
     }
 
-    private enum CodingKeys: String, CodingKey { case dailyTargetMinutes, idlePauseMinutes }
+    private enum CodingKeys: String, CodingKey { case dailyTargetMinutes, idlePauseMinutes, calendarURL }
 
     // Missing keys fall back to defaults, so files from older versions keep loading.
     public init(from decoder: Decoder) throws {
@@ -100,7 +103,8 @@ public struct Preferences: Codable, Hashable, Sendable {
             dailyTargetMinutes: try container.decodeIfPresent(Int.self, forKey: .dailyTargetMinutes)
                 ?? defaults.dailyTargetMinutes,
             idlePauseMinutes: try container.decodeIfPresent(Int.self, forKey: .idlePauseMinutes)
-                ?? defaults.idlePauseMinutes
+                ?? defaults.idlePauseMinutes,
+            calendarURL: try container.decodeIfPresent(String.self, forKey: .calendarURL) ?? defaults.calendarURL
         )
     }
 }

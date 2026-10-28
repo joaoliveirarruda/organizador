@@ -4,40 +4,68 @@ import SwiftUI
 
 struct PreferencesView: View {
     @Environment(AppModel.self) private var model
+    @State private var calendarLink = ""
 
     var body: some View {
         let preferences = model.data.preferences
         Form {
-            Stepper(
-                "Meta diária: \(preferences.dailyTargetMinutes == 0 ? "sem meta" : DurationFormat.short(TimeInterval(preferences.dailyTargetMinutes * 60)))",
-                value: Binding(
-                    get: { preferences.dailyTargetMinutes },
-                    set: { model.setDailyTarget(minutes: $0) }
-                ),
-                in: 0...960,
-                step: 30
-            )
+            Section("Cronômetro") {
+                Stepper(
+                    "Meta diária: \(preferences.dailyTargetMinutes == 0 ? "sem meta" : DurationFormat.short(TimeInterval(preferences.dailyTargetMinutes * 60)))",
+                    value: Binding(
+                        get: { preferences.dailyTargetMinutes },
+                        set: { model.setDailyTarget(minutes: $0) }
+                    ),
+                    in: 0...960,
+                    step: 30
+                )
 
-            Stepper(
-                "Pausar após \(preferences.idlePauseMinutes == 0 ? "nunca (desligado)" : "\(preferences.idlePauseMinutes) min sem usar o Mac")",
-                value: Binding(
-                    get: { preferences.idlePauseMinutes },
-                    set: { model.setIdlePause(minutes: $0) }
-                ),
-                in: 0...120,
-                step: 5
-            )
+                Stepper(
+                    "Pausar após \(preferences.idlePauseMinutes == 0 ? "nunca (desligado)" : "\(preferences.idlePauseMinutes) min sem usar o Mac")",
+                    value: Binding(
+                        get: { preferences.idlePauseMinutes },
+                        set: { model.setIdlePause(minutes: $0) }
+                    ),
+                    in: 0...120,
+                    step: 5
+                )
+            }
+
+            Section("Agenda") {
+                SecureField("Endereço secreto no formato iCal", text: $calendarLink)
+                    .onSubmit { model.setCalendarURL(calendarLink) }
+                HStack {
+                    Button(model.hasCalendar ? "Salvar e atualizar" : "Conectar") {
+                        model.setCalendarURL(calendarLink)
+                    }
+                    .disabled(calendarLink.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if model.hasCalendar {
+                        Button("Desconectar", role: .destructive) {
+                            calendarLink = ""
+                            model.setCalendarURL("")
+                        }
+                    }
+                    Spacer()
+                    CalendarSyncStatus()
+                }
+                Text("No Google Agenda na web: Configurações › clique na sua agenda › \"Endereço secreto no formato iCal\". O link fica só no seu Mac.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if let url = model.dataFileURL {
-                LabeledContent("Seus dados") {
-                    Button("Mostrar no Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([url])
+                Section {
+                    LabeledContent("Seus dados") {
+                        Button("Mostrar no Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
                     }
                 }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
+        .frame(width: 520)
         .padding()
+        .onAppear { calendarLink = model.data.preferences.calendarURL }
     }
 }

@@ -313,3 +313,131 @@ final class HabitTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.completionRate(habit, days: 7, now: date(28, 10)), 4.0 / 7.0, accuracy: 1e-9)
     }
 }
+
+final class ICalendarTests: XCTestCase {
+    let saoPaulo = TimeZone(identifier: "America/Sao_Paulo")!
+    let utc = TimeZone(identifier: "UTC")!
+
+    func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, in zone: TimeZone) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        return calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+    }
+
+    func feed(_ events: String...) -> String {
+        (["BEGIN:VCALENDAR", "VERSION:2.0"] + events + ["END:VCALENDAR"]).joined(separator: "\r\n")
+    }
+
+    func window(_ fromDay: Int, _ toDay: Int, month: Int = 10) -> DateInterval {
+        DateInterval(start: date(2026, month, fromDay, in: saoPaulo), end: date(2026, month, toDay, in: saoPaulo))
+    }
+
+    func testParsesTimesInUTCAndTZIDAndAllDay() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:a", "SUMMARY:Daily", "DTSTART:20261028T120000Z", "DTEND:20261028T121500Z", "END:VEVENT",
+            "BEGIN:VEVENT", "UID:b", "SUMMARY:1:1", "DTSTART;TZID=America/Sao_Paulo:20261028T140000",
+            "DTEND;TZID=America/Sao_Paulo:20261028T143000", "LOCATION:Sala 2", "END:VEVENT",
+            "BEGIN:VEVENT", "UID:c", "SUMMARY:Feriado", "DTSTART;VALUE=DATE:20261102", "DTEND;VALUE=DATE:20261103", "END:VEVENT"
+        )
+        let events = ICSParser.parse(text, defaultTimeZone: saoPaulo)
+        XCTAssertEqual(events.count, 3)
+
+        XCTAssertEqual(events[0].start, date(2026, 10, 28, 12, in: utc))
+        XCTAssertEqual(events[0].duration, 900)
+
+        XCTAssertEqual(events[1].summary, "1:1")
+        XCTAssertEqual(events[1].start, date(2026, 10, 28, 14, in: saoPaulo))
+        XCTAssertEqual(events[1].location, "Sala 2")
+
+        XCTAssertTrue(events[2].isAllDay)
+        XCTAssertEqual(events[2].start, date(2026, 11, 2, in: saoPaulo))
+        XCTAssertEqual(events[2].duration, 86_400)
+    }
+
+    func testUnfoldsLinesUnescapesTextAndSkipsAlarms() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:a", "SUMMARY:Planejamento\\, revisão",
+            " e próximos passos", "DTSTART:20261028T120000Z", "DURATION:PT1H30M",
+            "BEGIN:VALARM", "SUMMARY:Lembrete", "TRIGGER:-PT10M", "END:VALARM", "END:VEVENT"
+        )
+        let events = ICSParser.parse(text, defaultTimeZone: saoPaulo)
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events[0].summary, "Planejamento, revisãoe próximos passos")
+        XCTAssertEqual(events[0].duration, 5400)
+    }
+
+    func testWeeklyRecurrenceWithByDayCountAndExdate() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:w", "SUMMARY:Standup",
+            "DTSTART;TZID=America/Sao_Paulo:20261026T090000", "DTEND;TZID=America/Sao_Paulo:20261026T091500",
+            "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=6",
+            "EXDATE;TZID=America/Sao_Paulo:20261028T090000", "END:VEVENT"
+        )
+        let occurrences = CalendarExpansion.occurrences(
+            of: ICSParser.parse(text, defaultTimeZone: saoPaulo), in: DateInterval(start: date(2026, 10, 1, in: saoPaulo), end: date(2026, 11, 30, in: saoPaulo))
+        )
+        // Mon 26, (Wed 28 excluded), Fri 30, Mon 2, Wed 4, Fri 6 — COUNT includes the excluded one.
+        XCTAssertEqual(occurrences.map(\.start), [
+            date(2026, 10, 26, 9, in: saoPaulo), date(2026, 10, 30, 9, in: saoPaulo),
+            date(2026, 11, 2, 9, in: saoPaulo), date(2026, 11, 4, 9, in: saoPaulo), date(2026, 11, 6, 9, in: saoPaulo),
+        ])
+        XCTAssertEqual(occurrences[0].end.timeIntervalSince(occurrences[0].start), 900)
+    }
+
+    func testEditedAndCancelledOccurrencesReplaceTheOriginal() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:d", "SUMMARY:Daily", "DTSTART:20261026T120000Z", "DTEND:20261026T121500Z",
+            "RRULE:FREQ=DAILY;UNTIL=20261029T235959Z", "END:VEVENT",
+            "BEGIN:VEVENT", "UID:d", "SUMMARY:Daily (mais tarde)", "RECURRENCE-ID:20261027T120000Z",
+            "DTSTART:20261027T150000Z", "DTEND:20261027T151500Z", "END:VEVENT",
+            "BEGIN:VEVENT", "UID:d", "SUMMARY:Daily", "RECURRENCE-ID:20261028T120000Z", "STATUS:CANCELLED",
+            "DTSTART:20261028T120000Z", "DTEND:20261028T121500Z", "END:VEVENT"
+        )
+        let occurrences = CalendarExpansion.occurrences(of: ICSParser.parse(text, defaultTimeZone: saoPaulo), in: window(1, 31))
+        XCTAssertEqual(occurrences.map(\.start), [
+            date(2026, 10, 26, 12, in: utc), date(2026, 10, 27, 15, in: utc), date(2026, 10, 29, 12, in: utc),
+        ])
+        XCTAssertEqual(occurrences[1].title, "Daily (mais tarde)")
+    }
+
+    func testMonthlyRecurrences() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:m1", "SUMMARY:Fechamento", "DTSTART:20261031T120000Z", "DTEND:20261031T130000Z",
+            "RRULE:FREQ=MONTHLY;COUNT=3", "END:VEVENT",
+            "BEGIN:VEVENT", "UID:m2", "SUMMARY:Comitê", "DTSTART:20261013T120000Z", "DTEND:20261013T130000Z",
+            "RRULE:FREQ=MONTHLY;BYDAY=2TU", "END:VEVENT"
+        )
+        let events = ICSParser.parse(text, defaultTimeZone: saoPaulo)
+        let all = CalendarExpansion.occurrences(of: events, in: DateInterval(
+            start: date(2026, 10, 1, in: utc), end: date(2027, 3, 1, in: utc)
+        ))
+        // The 31st skips months without a 31st.
+        XCTAssertEqual(all.filter { $0.title == "Fechamento" }.map(\.start), [
+            date(2026, 10, 31, 12, in: utc), date(2026, 12, 31, 12, in: utc), date(2027, 1, 31, 12, in: utc),
+        ])
+        // Second Tuesday of each month.
+        XCTAssertEqual(all.filter { $0.title == "Comitê" }.map(\.start), [
+            date(2026, 10, 13, 12, in: utc), date(2026, 11, 10, 12, in: utc), date(2026, 12, 8, 12, in: utc),
+            date(2027, 1, 12, 12, in: utc), date(2027, 2, 9, 12, in: utc),
+        ])
+    }
+
+    func testWindowOnlyReturnsOverlappingOccurrences() {
+        let text = feed(
+            "BEGIN:VEVENT", "UID:x", "SUMMARY:Semanal", "DTSTART:20260105T120000Z", "DTEND:20260105T130000Z",
+            "RRULE:FREQ=WEEKLY", "END:VEVENT"
+        )
+        let occurrences = CalendarExpansion.occurrences(
+            of: ICSParser.parse(text, defaultTimeZone: saoPaulo),
+            in: DateInterval(start: date(2026, 10, 26, in: utc), end: date(2026, 11, 2, in: utc))
+        )
+        XCTAssertEqual(occurrences.map(\.start), [date(2026, 10, 26, 12, in: utc)])
+    }
+
+    func testDurationParsing() {
+        XCTAssertEqual(ICSParser.parseDuration("PT1H30M"), 5400)
+        XCTAssertEqual(ICSParser.parseDuration("P1D"), 86_400)
+        XCTAssertEqual(ICSParser.parseDuration("P1W"), 604_800)
+        XCTAssertNil(ICSParser.parseDuration("1H"))
+    }
+}

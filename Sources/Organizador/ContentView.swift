@@ -1,12 +1,14 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case timer, goals, tasks, habits, history, stats
+    case today, agenda, timer, goals, tasks, habits, history, stats
 
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .today: "Hoje"
+        case .agenda: "Agenda"
         case .timer: "Cronômetro"
         case .goals: "Metas"
         case .tasks: "Tarefas"
@@ -18,6 +20,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .today: "sun.max"
+        case .agenda: "calendar"
         case .timer: "timer"
         case .goals: "flag"
         case .tasks: "checklist"
@@ -30,7 +34,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
-    @State private var selection: SidebarItem? = .timer
+    @State private var selection: SidebarItem? = .today
 
     var body: some View {
         NavigationSplitView {
@@ -39,7 +43,9 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 160, ideal: 180)
         } detail: {
-            switch selection ?? .timer {
+            switch selection ?? .today {
+            case .today: TodayScreen()
+            case .agenda: AgendaScreen()
             case .timer: TimerScreen()
             case .goals: GoalsScreen()
             case .tasks: TasksScreen()
