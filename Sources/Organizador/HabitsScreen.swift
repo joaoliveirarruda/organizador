@@ -81,7 +81,7 @@ struct HabitCard: View {
                 .help("Editar hábito")
             }
 
-            Text(subtitle).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+            Text(subtitle).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
             HStack(spacing: 16) {
                 Button(doneToday ? "Desmarcar hoje" : "Marcar hoje") { model.toggleHabit(habit.id, on: now) }
                     .buttonStyle(.plain)

@@ -147,7 +147,7 @@ struct StartBox: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(area.name).foregroundStyle(Theme.text)
                             Text(area.goalID.flatMap(model.goal)?.title ?? "Atividade independente")
-                                .font(Theme.font(size: 10)).foregroundStyle(Theme.secondaryText)
+                                .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Theme.secondaryText)

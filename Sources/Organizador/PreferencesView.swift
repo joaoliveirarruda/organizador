@@ -166,7 +166,7 @@ struct PreferencesView: View {
             Button { selectedSection = title } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack { Text(title).foregroundStyle(Theme.text); Spacer(); Text("›").foregroundStyle(Theme.secondaryText) }
-                    Text(description).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+                    Text(description).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 7)

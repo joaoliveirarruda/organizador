@@ -26,7 +26,7 @@ struct AreaPage: View {
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ÁREA").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        Text("ÁREA").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                         Text(area.name).font(Theme.font(size: 28, weight: .bold))
                     }
                 }

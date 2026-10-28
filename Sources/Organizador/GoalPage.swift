@@ -23,7 +23,7 @@ struct GoalPage: View {
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("OBJETIVO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        Text("OBJETIVO").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(goal.title).font(Theme.font(size: 28, weight: .bold))
                             if let thread { StateBadge(state: thread.state) }

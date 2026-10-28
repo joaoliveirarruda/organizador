@@ -84,7 +84,7 @@ private struct Sidebar: View {
             VStack(alignment: .leading, spacing: 1) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("organizador").font(Theme.font(size: 16, weight: .semibold))
-                    Text("SEU ESPAÇO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "72817d"))
+                    Text("SEU ESPAÇO").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                 }
                 .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 10)
                 SidebarRow(title: "Buscar", symbol: "magnifyingglass", route: .search)
