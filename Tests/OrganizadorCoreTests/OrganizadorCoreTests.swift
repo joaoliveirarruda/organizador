@@ -192,6 +192,7 @@ final class JSONStoreTests: XCTestCase {
         let json = #"{"activities":[],"sessions":[],"preferences":{"dailyTargetMinutes":120}}"#
         let data = try JSONStore.makeDecoder().decode(AppData.self, from: Data(json.utf8))
         XCTAssertEqual(data.goals, [])
+        XCTAssertEqual(data.tasks, [])
         XCTAssertNil(data.running)
         XCTAssertEqual(data.preferences, Preferences(dailyTargetMinutes: 120, idlePauseMinutes: 10))
         XCTAssertEqual(data.schemaVersion, AppData.currentSchemaVersion)
@@ -209,5 +210,46 @@ final class DurationFormatTests: XCTestCase {
         XCTAssertEqual(DurationFormat.short(15 * 60), "15min")
         XCTAssertEqual(DurationFormat.short(3 * 3600), "3h")
         XCTAssertEqual(DurationFormat.short(3 * 3600 + 15 * 60 + 59), "3h 15min")
+    }
+}
+
+final class TaskListsTests: XCTestCase {
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    func day(_ day: Int, _ hour: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour))!
+    }
+
+    func testTodayIncludesOverdueAndSortsByDueThenPriority() {
+        let now = day(28, 15)
+        let overdue = TaskItem(title: "Atrasada", dueDate: day(26))
+        let todayLow = TaskItem(title: "Hoje baixa", dueDate: day(28), priority: .low)
+        let todayHigh = TaskItem(title: "Hoje alta", dueDate: day(28), priority: .high)
+        let tomorrow = TaskItem(title: "Amanhã", dueDate: day(29))
+        let undated = TaskItem(title: "Sem data")
+        let done = TaskItem(title: "Feita", dueDate: day(28), completedAt: day(28, 9))
+        let all = [tomorrow, undated, todayLow, done, overdue, todayHigh]
+
+        XCTAssertEqual(TaskLists.today(all, now: now, calendar: calendar).map(\.title), ["Atrasada", "Hoje alta", "Hoje baixa"])
+        XCTAssertEqual(TaskLists.upcoming(all, now: now, calendar: calendar).map(\.title), ["Amanhã", "Sem data"])
+        XCTAssertEqual(TaskLists.completed(all).map(\.title), ["Feita"])
+    }
+
+    func testOverdue() {
+        let now = day(28, 15)
+        XCTAssertTrue(TaskLists.isOverdue(TaskItem(title: "a", dueDate: day(27)), now: now, calendar: calendar))
+        XCTAssertFalse(TaskLists.isOverdue(TaskItem(title: "b", dueDate: day(28)), now: now, calendar: calendar))
+        XCTAssertFalse(TaskLists.isOverdue(TaskItem(title: "c", dueDate: day(27), completedAt: now), now: now, calendar: calendar))
+        XCTAssertFalse(TaskLists.isOverdue(TaskItem(title: "d"), now: now, calendar: calendar))
+    }
+
+    func testCompletedNewestFirst() {
+        let first = TaskItem(title: "primeira", completedAt: day(20))
+        let second = TaskItem(title: "segunda", completedAt: day(25))
+        XCTAssertEqual(TaskLists.completed([first, second]).map(\.title), ["segunda", "primeira"])
     }
 }

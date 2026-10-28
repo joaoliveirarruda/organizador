@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case timer, goals, history, stats
+    case timer, goals, tasks, history, stats
 
     var id: Self { self }
 
@@ -9,6 +9,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .timer: "Cronômetro"
         case .goals: "Metas"
+        case .tasks: "Tarefas"
         case .history: "Histórico"
         case .stats: "Estatísticas"
         }
@@ -18,6 +19,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .timer: "timer"
         case .goals: "flag"
+        case .tasks: "checklist"
         case .history: "list.bullet.rectangle"
         case .stats: "chart.bar"
         }
@@ -38,6 +40,7 @@ struct ContentView: View {
             switch selection ?? .timer {
             case .timer: TimerScreen()
             case .goals: GoalsScreen()
+            case .tasks: TasksScreen()
             case .history: HistoryScreen()
             case .stats: StatsScreen()
             }
