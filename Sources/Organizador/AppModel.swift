@@ -264,6 +264,54 @@ final class AppModel {
         for index in data.activities.indices where data.activities[index].goalID == id {
             data.activities[index].goalID = nil
         }
+        for index in data.tasks.indices where data.tasks[index].goalID == id {
+            data.tasks[index].goalID = nil
+        }
+        persist()
+    }
+
+    /// Completed and total tasks linked to the goal.
+    func taskCounts(forGoal goalID: UUID) -> (done: Int, total: Int) {
+        let linked = data.tasks.filter { $0.goalID == goalID }
+        return (linked.filter(\.isDone).count, linked.count)
+    }
+
+    // MARK: - Tasks
+
+    var todayTasks: [TaskItem] { TaskLists.today(data.tasks, now: now, calendar: calendar) }
+
+    var upcomingTasks: [TaskItem] { TaskLists.upcoming(data.tasks, now: now, calendar: calendar) }
+
+    var completedTasks: [TaskItem] { TaskLists.completed(data.tasks) }
+
+    func isOverdue(_ task: TaskItem) -> Bool {
+        TaskLists.isOverdue(task, now: now, calendar: calendar)
+    }
+
+    func addTask(title: String, dueToday: Bool) {
+        let due = dueToday ? calendar.startOfDay(for: Date()) : nil
+        data.tasks.append(TaskItem(title: title, dueDate: due))
+        persist()
+    }
+
+    /// Adds the task, or replaces the one with the same id.
+    func saveTask(_ task: TaskItem) {
+        if let index = data.tasks.firstIndex(where: { $0.id == task.id }) {
+            data.tasks[index] = task
+        } else {
+            data.tasks.append(task)
+        }
+        persist()
+    }
+
+    func toggleTaskDone(_ id: UUID) {
+        guard let index = data.tasks.firstIndex(where: { $0.id == id }) else { return }
+        data.tasks[index].completedAt = data.tasks[index].isDone ? nil : Date()
+        persist()
+    }
+
+    func deleteTask(_ id: UUID) {
+        data.tasks.removeAll { $0.id == id }
         persist()
     }
 

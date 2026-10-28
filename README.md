@@ -22,9 +22,15 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Você escolhe quais atividades contam para cada meta; o tempo cronometrado nelas vira progresso.
 - Barra de progresso, ritmo semanal necessário para chegar no prazo e quanto você fez nesta semana.
 
+**Tarefas:**
+
+- Listas Hoje (inclui atrasadas), Próximas e Concluídas.
+- Adição rápida com Enter, prazo, prioridade, notas e ligação com uma meta.
+- O cartão da meta mostra quantas tarefas ligadas já foram concluídas.
+
 ## Próximos passos
 
-1. Tarefas e hábitos.
+1. Hábitos.
 2. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
 3. Finanças: lançamentos, categorias, orçamento e importação de extrato.
 
