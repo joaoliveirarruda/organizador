@@ -96,7 +96,11 @@ struct MarkdownEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
-        textView.textContainerInset = NSSize(width: 32, height: 24)
+        // Transparent so the page color shows through, same as the header above it.
+        scrollView.drawsBackground = false
+        textView.drawsBackground = false
+        // 35 + the 5pt line padding lines the text up with the title's 40pt margin.
+        textView.textContainerInset = NSSize(width: 35, height: 24)
         textView.typingAttributes = MarkdownStyle.baseAttributes
         textView.linkTextAttributes = [.cursor: NSCursor.pointingHand]
         context.coordinator.textView = textView
