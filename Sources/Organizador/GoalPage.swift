@@ -43,8 +43,7 @@ struct GoalPage: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .pageColumn()
         }
         .sheet(isPresented: $editing) { GoalEditor(goal: goal) }
         .sheet(isPresented: $addingArea) { ActivityEditor(activity: nil, goalID: goal.id) }

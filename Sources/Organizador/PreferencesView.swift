@@ -28,8 +28,7 @@ struct PreferencesView: View {
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
         .preferredColorScheme(.dark)
         .onAppear {

@@ -358,6 +358,14 @@ struct SegmentedTabs<Value: Hashable>: View {
     }
 }
 
+extension View {
+    /// The column every page sits in: at most 888 points wide, centered in the window.
+    func pageColumn() -> some View {
+        frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .top)
+    }
+}
+
 extension String {
     /// "Quarta-feira, 28 de outubro": only the first letter goes up, unlike `capitalized`.
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }

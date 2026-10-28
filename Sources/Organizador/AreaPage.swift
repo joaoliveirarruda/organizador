@@ -73,8 +73,7 @@ struct AreaPage: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .pageColumn()
         }
         .sheet(isPresented: $editing) { ActivityEditor(activity: area) }
         .sheet(item: $editingSession) { SessionEditor(session: $0) }

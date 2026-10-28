@@ -47,8 +47,7 @@ struct ReportScreen: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
         .toolbar { ToolbarItem(placement: .principal) { TimeTabs() } }
     }
