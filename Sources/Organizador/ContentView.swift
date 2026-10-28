@@ -22,6 +22,8 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Theme.page)
                 .foregroundStyle(Theme.text)
+                .toolbarBackground(Theme.page, for: .windowToolbar)
+                .toolbarBackground(.visible, for: .windowToolbar)
         }
         .onReceive(NotificationCenter.default.publisher(for: StaleNotifier.openHome)) { _ in model.route = .home }
         .preferredColorScheme(.dark)
