@@ -15,95 +15,98 @@ struct NotesScreen: View {
     @State private var mode: Mode = .editor
     @State private var search = ""
     @State private var trashingNote: Note?
-    @FocusState private var searchFocused: Bool
 
     private var library: NotesLibrary { model.notes }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                ScreenHeading(
-                    section: "Notas",
-                    title: library.selected?.title ?? "Notas",
-                    subtitle: library.selected.map { "Salvo agora · \($0.modifiedAt.formatted(.relative(presentation: .named)))" } ?? "Escreva em Markdown e conecte suas ideias."
-                )
-                PageSection(title: "Biblioteca") {
-                    TextField("Buscar notas", text: $search)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($searchFocused)
-                    if filteredNotes.isEmpty {
-                        Text("Nenhuma nota encontrada.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
-                    }
-                    ForEach(filteredNotes) { note in
-                        Button { library.selectedURL = note.url } label: {
-                            HStack {
-                                Text(note.title).foregroundStyle(Theme.text)
-                                Text("›").foregroundStyle(Theme.secondaryText)
-                                Spacer()
-                                Text(note.modifiedAt.formatted(.relative(presentation: .named)))
-                                    .font(Theme.font(size: 10)).foregroundStyle(Theme.secondaryText)
-                            }
-                            .padding(.vertical, 5)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
-                        }
+        HStack(spacing: 0) {
+            list
+                .frame(width: 260)
+                .background(Theme.sidebar.opacity(0.5))
+            Divider()
+            Group {
+                if mode == .graph {
+                    NoteGraphView(
+                        graph: NoteGraph.build(notes: library.notes, goals: model.data.goals, tasks: model.data.tasks),
+                        selected: library.selectedURL,
+                        onOpen: open
+                    )
+                    .padding(20)
+                } else if let note = library.selected {
+                    NotePage(note: note).id(note.url)
+                } else {
+                    ContentUnavailableView {
+                        Label("Nenhuma nota aberta", systemImage: "note.text")
+                    } description: {
+                        Text("Escolha uma nota na lista ou crie uma nova.")
+                    } actions: {
+                        Button("Nova nota") { createNote() }.buttonStyle(.heading(primary: true))
                     }
                 }
-                PageSection(title: mode == .editor ? "Editor" : "Grafo") {
-                    if mode == .graph {
-                        NoteGraphView(
-                            graph: NoteGraph.build(notes: library.notes, goals: model.data.goals, tasks: model.data.tasks),
-                            selected: library.selectedURL,
-                            onOpen: open
-                        )
-                        .frame(height: 300)
-                    } else if let note = library.selected {
-                        let body = FrontMatter.parse(note.body).body
-                        let mention = WikiLinks.targets(in: body).first
-                        Text(body.isEmpty ? "Esta nota ainda está vazia." : body)
-                            .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
-                            .lineLimit(5)
-                        if let mention {
-                            Button("\(mention)   ›") { openMentioned(in: note) }
-                                .buttonStyle(.plain)
-                        }
-                        Button("Editar texto   ›") { model.route = .note(note.url) }
-                            .buttonStyle(.plain)
-                    } else {
-                        Text("Escolha uma nota ou crie uma nova.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
-                    }
-                }
-                if let note = library.selected {
-                    PageSection(title: "Mencionada em") {
-                        Backlinks(note: note, notes: library.notes) { model.route = .note($0.url) }
-                    }
-                }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                    Button("Nova nota") { createNote() }.buttonStyle(AppActionButtonStyle())
-                    Button(mode == .graph ? "Editor" : "Grafo") { mode = mode == .graph ? .editor : .graph }.buttonStyle(AppActionButtonStyle())
-                    Button("Buscar notas") { searchFocused = true }.buttonStyle(AppActionButtonStyle())
-                    Menu("Mais ações") {
-                        if let note = library.selected {
-                            Button("Abrir no Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
-                            Button("Abrir como página") { model.route = .note(note.url) }
-                            Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
-                        }
-                    }
-                    .buttonStyle(AppActionButtonStyle())
-                    Button("Ícone e capa") { if let note = library.selected { model.route = .note(note.url) } }
-                        .buttonStyle(AppActionButtonStyle())
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Modo", selection: $mode) {
+                    ForEach(Mode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
             }
-            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .confirmationDialog("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
             Button("Mover para o Lixo", role: .destructive) { library.trash(note); trashingNote = nil }
         } message: { _ in Text("A nota será removida.") }
+    }
+
+    /// The notes column: search, the new-note button and every note.
+    private var list: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Notas").font(Theme.font(size: 16, weight: .semibold))
+                Spacer()
+                Button("Nova nota", systemImage: "square.and.pencil") { createNote() }
+                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                    .help("Nova nota (⌘N)")
+                    .keyboardShortcut("n")
+            }
+            TextField("Buscar notas", text: $search)
+                .textFieldStyle(.roundedBorder)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    if filteredNotes.isEmpty {
+                        Text("Nenhuma nota encontrada.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                    }
+                    ForEach(filteredNotes) { note in
+                        let selected = library.selectedURL == note.url
+                        Button {
+                            library.selectedURL = note.url
+                            mode = .editor
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(note.title).foregroundStyle(Theme.text).lineLimit(1)
+                                Text(note.modifiedAt.formatted(.relative(presentation: .named)))
+                                    .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8).padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 7).fill(selected ? Theme.hover : .clear))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
+                            Button("Abrir como página") { model.route = .note(note.url) }
+                            Divider()
+                            Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
     }
 
     private var filteredNotes: [Note] {
@@ -122,12 +125,9 @@ struct NotesScreen: View {
     }
 
     private func createNote() {
-        if let note = library.create() { model.route = .note(note.url) }
-    }
-
-    private func openMentioned(in note: Note) {
-        guard let target = WikiLinks.targets(in: note.body).first,
-              let ref = NoteGraph.resolve(target, notes: library.notes, goals: model.data.goals, tasks: model.data.tasks)?.ref else { return }
-        model.open(ref)
+        if let note = library.create() {
+            library.selectedURL = note.url
+            mode = .editor
+        }
     }
 }
