@@ -315,6 +315,47 @@ final class AppModel {
         persist()
     }
 
+    // MARK: - Habits
+
+    var habitTracker: HabitTracker {
+        HabitTracker(checks: data.habitChecks, spans: spans, calendar: calendar)
+    }
+
+    func habit(_ id: UUID) -> Habit? {
+        data.habits.first { $0.id == id }
+    }
+
+    /// Checks or unchecks the habit on `day`. Days done by the timer stay done.
+    func toggleHabit(_ habitID: UUID, on day: Date) {
+        let start = calendar.startOfDay(for: day)
+        guard start <= calendar.startOfDay(for: Date()) else { return }
+        if let index = data.habitChecks.firstIndex(where: {
+            $0.habitID == habitID && calendar.isDate($0.day, inSameDayAs: start)
+        }) {
+            data.habitChecks.remove(at: index)
+        } else {
+            data.habitChecks.append(HabitCheck(habitID: habitID, day: start))
+        }
+        persist()
+    }
+
+    /// Adds the habit, or replaces the one with the same id.
+    func saveHabit(_ habit: Habit) {
+        if let index = data.habits.firstIndex(where: { $0.id == habit.id }) {
+            data.habits[index] = habit
+        } else {
+            data.habits.append(habit)
+        }
+        persist()
+    }
+
+    /// Deletes the habit and its checks.
+    func deleteHabit(_ id: UUID) {
+        data.habits.removeAll { $0.id == id }
+        data.habitChecks.removeAll { $0.habitID == id }
+        persist()
+    }
+
     // MARK: - Sessions
 
     /// Adds the session, or replaces the one with the same id.

@@ -193,6 +193,8 @@ final class JSONStoreTests: XCTestCase {
         let data = try JSONStore.makeDecoder().decode(AppData.self, from: Data(json.utf8))
         XCTAssertEqual(data.goals, [])
         XCTAssertEqual(data.tasks, [])
+        XCTAssertEqual(data.habits, [])
+        XCTAssertEqual(data.habitChecks, [])
         XCTAssertNil(data.running)
         XCTAssertEqual(data.preferences, Preferences(dailyTargetMinutes: 120, idlePauseMinutes: 10))
         XCTAssertEqual(data.schemaVersion, AppData.currentSchemaVersion)
@@ -251,5 +253,63 @@ final class TaskListsTests: XCTestCase {
         let first = TaskItem(title: "primeira", completedAt: day(20))
         let second = TaskItem(title: "segunda", completedAt: day(25))
         XCTAssertEqual(TaskLists.completed([first, second]).map(\.title), ["segunda", "primeira"])
+    }
+}
+
+final class HabitTrackerTests: XCTestCase {
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    func date(_ day: Int, _ hour: Int = 0, _ minute: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+    }
+
+    func testManualCheckMarksDayDone() {
+        let habit = Habit(name: "Meditar", colorHex: "#20BF6B")
+        let tracker = HabitTracker(checks: [HabitCheck(habitID: habit.id, day: date(28, 9))], spans: [], calendar: calendar)
+        XCTAssertTrue(tracker.isDone(habit, on: date(28, 22)))
+        XCTAssertFalse(tracker.isDone(habit, on: date(27, 12)))
+    }
+
+    func testTimerMarksDayDoneAfterEnoughMinutes() {
+        let reading = UUID()
+        let habit = Habit(name: "Ler 30 min", colorHex: "#2D98DA", autoActivityID: reading, autoMinutes: 30)
+        let spans = [
+            TimeSpan(activityID: reading, start: date(27, 20), end: date(27, 20, 20)),
+            TimeSpan(activityID: reading, start: date(28, 8), end: date(28, 8, 15)),
+            TimeSpan(activityID: reading, start: date(28, 21), end: date(28, 21, 15)),
+        ]
+        let tracker = HabitTracker(checks: [], spans: spans, calendar: calendar)
+        XCTAssertFalse(tracker.isDone(habit, on: date(27)))
+        XCTAssertTrue(tracker.isDone(habit, on: date(28)))
+        XCTAssertTrue(tracker.isDoneByTimer(habit, on: date(28)))
+    }
+
+    func testStreakCountsUpToYesterdayWhenTodayIsOpen() {
+        let habit = Habit(name: "Meditar", colorHex: "#20BF6B")
+        let checks = [25, 26, 27].map { HabitCheck(habitID: habit.id, day: date($0)) }
+        let tracker = HabitTracker(checks: checks, spans: [], calendar: calendar)
+        XCTAssertEqual(tracker.currentStreak(habit, now: date(28, 10)), 3)
+
+        let withToday = HabitTracker(checks: checks + [HabitCheck(habitID: habit.id, day: date(28))], spans: [], calendar: calendar)
+        XCTAssertEqual(withToday.currentStreak(habit, now: date(28, 10)), 4)
+    }
+
+    func testStreakBreaksOnMissedDay() {
+        let habit = Habit(name: "Meditar", colorHex: "#20BF6B")
+        let checks = [24, 25, 27, 28].map { HabitCheck(habitID: habit.id, day: date($0)) }
+        let tracker = HabitTracker(checks: checks, spans: [], calendar: calendar)
+        XCTAssertEqual(tracker.currentStreak(habit, now: date(28, 10)), 2)
+        XCTAssertEqual(tracker.currentStreak(habit, now: date(30, 10)), 0)
+    }
+
+    func testCompletionRate() {
+        let habit = Habit(name: "Meditar", colorHex: "#20BF6B")
+        let checks = [22, 24, 26, 28].map { HabitCheck(habitID: habit.id, day: date($0)) }
+        let tracker = HabitTracker(checks: checks, spans: [], calendar: calendar)
+        XCTAssertEqual(tracker.completionRate(habit, days: 7, now: date(28, 10)), 4.0 / 7.0, accuracy: 1e-9)
     }
 }
