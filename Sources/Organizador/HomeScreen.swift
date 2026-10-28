@@ -222,10 +222,11 @@ private struct DaySessionRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(width: 110, alignment: .leading)
-            HStack(spacing: 6) {
-                Circle().fill(Color(hex: activity?.colorHex ?? "")).frame(width: 8, height: 8)
-                Text(activity?.name ?? "Atividade removida")
-            }
+            // The dot sits in the gap before the name, so names line up with the meetings'.
+            Text(activity?.name ?? "Atividade removida")
+                .overlay(alignment: .leading) {
+                    Circle().fill(Color(hex: activity?.colorHex ?? "")).frame(width: 7, height: 7).offset(x: -10)
+                }
             Spacer()
             Text(DurationFormat.short(session.duration)).monospacedDigit().foregroundStyle(.secondary)
         }
