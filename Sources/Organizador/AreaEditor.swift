@@ -89,22 +89,23 @@ struct AreaSettings: View {
                     Button("Apagar", role: .destructive) { deleting = area }
                 }
             }
+            // Sheets hang off this one row: on a Section inside a Form they would be copied to every row.
             Button("Nova área") { adding = true }
-        }
-        .sheet(isPresented: $adding) { AreaEditor(area: nil) }
-        .sheet(item: $editing) { AreaEditor(area: $0) }
-        .confirmationDialog(
-            deleting.map { "Apagar \($0.name)?" } ?? "",
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            titleVisibility: .visible,
-            presenting: deleting
-        ) { area in
-            Button("Apagar \(area.name)", role: .destructive) {
-                model.deleteArea(area.id)
-                deleting = nil
-            }
-        } message: { _ in
-            Text("As atividades ficam sem área. O tempo registrado não muda.")
+                .sheet(isPresented: $adding) { AreaEditor(area: nil) }
+                .sheet(item: $editing) { AreaEditor(area: $0) }
+                .confirmationDialog(
+                    deleting.map { "Apagar \($0.name)?" } ?? "",
+                    isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                    titleVisibility: .visible,
+                    presenting: deleting
+                ) { area in
+                    Button("Apagar \(area.name)", role: .destructive) {
+                        model.deleteArea(area.id)
+                        deleting = nil
+                    }
+                } message: { _ in
+                    Text("As atividades ficam sem área. O tempo registrado não muda.")
+                }
         }
     }
 
