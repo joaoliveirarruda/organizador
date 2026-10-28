@@ -22,8 +22,8 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Theme.page)
                 .foregroundStyle(Theme.text)
-                .toolbarBackground(Theme.page, for: .windowToolbar)
-                .toolbarBackground(.visible, for: .windowToolbar)
+                // A clear toolbar lets each column's own color reach the top of the window.
+                .toolbarBackground(.hidden, for: .windowToolbar)
         }
         .onReceive(NotificationCenter.default.publisher(for: StaleNotifier.openHome)) { _ in model.route = .home }
         .preferredColorScheme(.dark)
@@ -76,6 +76,7 @@ private struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @State private var addingGoal = false
     @State private var showInactive = false
+    @State private var trashingNote: Note?
 
     var body: some View {
         ScrollView {
@@ -115,7 +116,16 @@ private struct Sidebar: View {
 
                 header("Recentes") { EmptyView() }
                 ForEach(model.notes.notes.sorted { $0.modifiedAt > $1.modifiedAt }.prefix(6)) { note in
-                    SidebarRow(title: note.title, icon: note.icon, base: model.notes.folder, route: .note(note.url))
+                    SidebarRow(title: note.title, icon: note.icon, base: model.notes.folder, route: .note(note.url)) {
+                        Button("Abrir") { model.route = .note(note.url) }
+                        Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
+                        Button("Exportar PDF…") {
+                            model.notes.saveNow()
+                            NotePDF.export(Note(url: note.url, body: FrontMatter.parse(note.body).body, modifiedAt: note.modifiedAt))
+                        }
+                        Divider()
+                        Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
+                    }
                 }
 
             }
@@ -127,6 +137,13 @@ private struct Sidebar: View {
         .background(Theme.sidebar)
         .foregroundStyle(Theme.text)
         .sheet(isPresented: $addingGoal) { GoalEditor(goal: nil) }
+        .confirmationDialog("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
+            Button("Mover para o Lixo", role: .destructive) {
+                model.notes.trash(note)
+                if model.route == .note(note.url) { model.route = .notes }
+                trashingNote = nil
+            }
+        } message: { _ in Text("A nota será removida.") }
     }
 
     private func header<Accessory: View>(_ title: String, @ViewBuilder accessory: () -> Accessory) -> some View {
@@ -150,6 +167,8 @@ private struct SidebarRow: View {
     var fallback = "doc.text"
     let route: Route?
     var action: (() -> Void)?
+    /// Actions shown behind a "…" button while the pointer is over the row.
+    var menu: AnyView?
     @State private var hovering = false
 
     init(title: String, symbol: String, route: Route?, action: (() -> Void)? = nil) {
@@ -167,6 +186,11 @@ private struct SidebarRow: View {
         self.route = route
     }
 
+    init<Menu: View>(title: String, icon: Icon?, base: URL, route: Route, @ViewBuilder menu: () -> Menu) {
+        self.init(title: title, icon: icon, base: base, route: route)
+        self.menu = AnyView(menu())
+    }
+
     var body: some View {
         let selected = route != nil && model.route == route
         Button {
@@ -180,6 +204,7 @@ private struct SidebarRow: View {
                 }
                 Text(title).lineLimit(1)
                 Spacer(minLength: 0)
+                if menu != nil, hovering { Color.clear.frame(width: 26) }
             }
             .font(Theme.font(size: 13, weight: selected ? .medium : .regular))
             .padding(.horizontal, 10)
@@ -188,6 +213,15 @@ private struct SidebarRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .trailing) {
+            if let menu, hovering {
+                Menu { menu } label: {
+                    Image(systemName: "ellipsis").foregroundStyle(Theme.secondaryText).frame(width: 30, height: 30).contentShape(Rectangle())
+                }
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+                .padding(.trailing, 2)
+            }
+        }
         .onHover { hovering = $0 }
     }
 }
