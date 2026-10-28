@@ -28,11 +28,16 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Adição rápida com Enter, prazo, prioridade, notas e ligação com uma meta.
 - O cartão da meta mostra quantas tarefas ligadas já foram concluídas.
 
+**Hábitos:**
+
+- Check diário, sequência atual e taxa dos últimos 30 dias.
+- Calendário de constância das últimas 12 semanas; clique num dia para marcar ou desmarcar.
+- Marcação automática pelo cronômetro (ex.: "Ler 30 min" fica feito quando Leitura passa de 30 min no dia).
+
 ## Próximos passos
 
-1. Hábitos.
-2. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
-3. Finanças: lançamentos, categorias, orçamento e importação de extrato.
+1. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
+2. Finanças: lançamentos, categorias, orçamento e importação de extrato.
 
 ## Como rodar
 
