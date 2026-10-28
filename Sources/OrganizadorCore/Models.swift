@@ -114,6 +114,8 @@ public struct AppData: Codable, Hashable, Sendable {
     public var goals: [Goal]
     public var sessions: [FocusSession]
     public var tasks: [TaskItem]
+    public var habits: [Habit]
+    public var habitChecks: [HabitCheck]
     public var running: RunningTimer?
     public var preferences: Preferences
 
@@ -123,6 +125,8 @@ public struct AppData: Codable, Hashable, Sendable {
         goals: [Goal] = [],
         sessions: [FocusSession] = [],
         tasks: [TaskItem] = [],
+        habits: [Habit] = [],
+        habitChecks: [HabitCheck] = [],
         running: RunningTimer? = nil,
         preferences: Preferences = Preferences()
     ) {
@@ -131,6 +135,8 @@ public struct AppData: Codable, Hashable, Sendable {
         self.goals = goals
         self.sessions = sessions
         self.tasks = tasks
+        self.habits = habits
+        self.habitChecks = habitChecks
         self.running = running
         self.preferences = preferences
     }
@@ -138,7 +144,7 @@ public struct AppData: Codable, Hashable, Sendable {
     public static let empty = AppData()
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, activities, goals, sessions, tasks, running, preferences
+        case schemaVersion, activities, goals, sessions, tasks, habits, habitChecks, running, preferences
     }
 
     // Missing keys fall back to defaults, so files from older versions keep loading
@@ -152,6 +158,8 @@ public struct AppData: Codable, Hashable, Sendable {
             goals: try container.decodeIfPresent([Goal].self, forKey: .goals) ?? [],
             sessions: try container.decodeIfPresent([FocusSession].self, forKey: .sessions) ?? [],
             tasks: try container.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? [],
+            habits: try container.decodeIfPresent([Habit].self, forKey: .habits) ?? [],
+            habitChecks: try container.decodeIfPresent([HabitCheck].self, forKey: .habitChecks) ?? [],
             running: try container.decodeIfPresent(RunningTimer.self, forKey: .running),
             preferences: try container.decodeIfPresent(Preferences.self, forKey: .preferences) ?? Preferences()
         )
