@@ -195,6 +195,8 @@ final class JSONStoreTests: XCTestCase {
         XCTAssertEqual(data.tasks, [])
         XCTAssertEqual(data.habits, [])
         XCTAssertEqual(data.habitChecks, [])
+        XCTAssertEqual(data.transactions, [])
+        XCTAssertEqual(data.financeCategories, [])
         XCTAssertNil(data.running)
         XCTAssertEqual(data.preferences, Preferences(dailyTargetMinutes: 120, idlePauseMinutes: 10))
         XCTAssertEqual(data.schemaVersion, AppData.currentSchemaVersion)
@@ -439,5 +441,134 @@ final class ICalendarTests: XCTestCase {
         XCTAssertEqual(ICSParser.parseDuration("P1D"), 86_400)
         XCTAssertEqual(ICSParser.parseDuration("P1W"), 604_800)
         XCTAssertNil(ICSParser.parseDuration("1H"))
+    }
+}
+
+final class FinanceTests: XCTestCase {
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        return calendar
+    }()
+
+    func day(_ month: Int, _ day: Int) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: month, day: day))!
+    }
+
+    func testMonthSummaryAndCategories() {
+        let food = UUID()
+        let all = [
+            MoneyTransaction(date: day(10, 5), amountCents: 500_000, description: "Salário"),
+            MoneyTransaction(date: day(10, 6), amountCents: -4_590, description: "Mercado", categoryID: food),
+            MoneyTransaction(date: day(10, 20), amountCents: -1_000, description: "Padaria", categoryID: food),
+            MoneyTransaction(date: day(10, 21), amountCents: -2_000, description: "Sem categoria"),
+            MoneyTransaction(date: day(11, 1), amountCents: -9_999, description: "Mês seguinte", categoryID: food),
+        ]
+        let october = Finance.month(containing: day(10, 15), calendar: calendar)
+        let summary = Finance.summary(all, in: october)
+
+        XCTAssertEqual(summary.incomeCents, 500_000)
+        XCTAssertEqual(summary.expenseCents, 7_590)
+        XCTAssertEqual(summary.balanceCents, 492_410)
+        XCTAssertEqual(summary.expenseByCategory[food], 5_590)
+        XCTAssertEqual(summary.expenseByCategory[nil], 2_000)
+        XCTAssertEqual(Finance.transactions(all, in: october).map(\.description), ["Sem categoria", "Padaria", "Mercado", "Salário"])
+    }
+
+    func testParseAmounts() {
+        XCTAssertEqual(StatementImporter.parseAmountCents("-45,90"), -4_590)
+        XCTAssertEqual(StatementImporter.parseAmountCents("R$ 1.234,56"), 123_456)
+        XCTAssertEqual(StatementImporter.parseAmountCents("1,234.56"), 123_456)
+        XCTAssertEqual(StatementImporter.parseAmountCents("-1.234"), -123_400)
+        XCTAssertEqual(StatementImporter.parseAmountCents("12.5"), 1_250)
+        XCTAssertEqual(StatementImporter.parseAmountCents("(12.00)"), -1_200)
+        XCTAssertEqual(StatementImporter.parseAmountCents("800"), 80_000)
+        XCTAssertNil(StatementImporter.parseAmountCents("abc"))
+    }
+
+    func testParsesSGMLOFXWithoutClosingTags() throws {
+        let ofx = """
+        OFXHEADER:100
+        DATA:OFXSGML
+        CHARSET:1252
+
+        <OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>
+        <STMTTRN>
+        <TRNTYPE>DEBIT
+        <DTPOSTED>20261027120000[-3:BRT]
+        <TRNAMT>-45.90
+        <FITID>202610270001
+        <MEMO>COMPRA CARTAO - PADARIA &amp; CAFE
+        <STMTTRN>
+        <TRNTYPE>CREDIT
+        <DTPOSTED>20261028
+        <TRNAMT>5000,00
+        <FITID>202610280002
+        <NAME>SALARIO
+        </BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>
+        """
+        let lines = try StatementImporter.parse(ofx, calendar: calendar)
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertEqual(lines[0].date, day(10, 27))
+        XCTAssertEqual(lines[0].amountCents, -4_590)
+        XCTAssertEqual(lines[0].description, "COMPRA CARTAO - PADARIA & CAFE")
+        XCTAssertEqual(lines[1].amountCents, 500_000)
+        XCTAssertEqual(lines[1].description, "SALARIO")
+        XCTAssertNotEqual(lines[0].key, lines[1].key)
+    }
+
+    func testParsesXMLOFXWithClosingTags() throws {
+        let ofx = "<OFX><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20261005</DTPOSTED>"
+            + "<TRNAMT>-10.00</TRNAMT><FITID>A1</FITID><MEMO>Uber</MEMO></STMTTRN></BANKTRANLIST></OFX>"
+        let lines = try StatementImporter.parse(ofx, calendar: calendar)
+        XCTAssertEqual(lines.map(\.amountCents), [-1_000])
+        XCTAssertEqual(lines.first?.description, "Uber")
+    }
+
+    func testParsesBrazilianCSV() throws {
+        let csv = """
+        Data;Descrição;Valor
+        27/10/2026;"Mercado; Pão de Açúcar";-123,45
+        27/10/2026;Café;-8,00
+        27/10/2026;Café;-8,00
+        linha inválida;;
+        28/10/26;PIX recebido;"1.500,00"
+        """
+        let lines = try StatementImporter.parse(csv, calendar: calendar)
+        XCTAssertEqual(lines.map(\.amountCents), [-12_345, -800, -800, 150_000])
+        XCTAssertEqual(lines[0].description, "Mercado; Pão de Açúcar")
+        XCTAssertEqual(lines[3].date, day(10, 28))
+        // Two identical coffees on the same day are two different lines.
+        XCTAssertNotEqual(lines[1].key, lines[2].key)
+    }
+
+    func testParsesNubankCardCSVWithInvertedSigns() throws {
+        let csv = "date,title,amount\n2026-10-20,Spotify,21.90\n2026-10-21,Estorno,-21.90\n"
+        let lines = try StatementImporter.parse(csv, invertSigns: true, calendar: calendar)
+        XCTAssertEqual(lines.map(\.amountCents), [-2_190, 2_190])
+        XCTAssertEqual(lines[0].date, day(10, 20))
+    }
+
+    func testCSVWithoutAmountColumnIsRejected() {
+        XCTAssertThrowsError(try StatementImporter.parse("Nome;Idade\nJoão;30", calendar: calendar)) { error in
+            XCTAssertEqual(error as? StatementImportError, .missingColumns)
+        }
+    }
+
+    func testImportSkipsDuplicatesAndRemembersCategories() throws {
+        let csv = "Data;Descrição;Valor\n27/10/2026;UBER *TRIP 123;-25,00\n28/10/2026;Café;-8,00\n"
+        let transport = UUID()
+        let first = try StatementImporter.parse(csv, calendar: calendar)
+        let earlier = MoneyTransaction(date: day(9, 1), amountCents: -1_800, description: "Uber *Trip 999", categoryID: transport)
+
+        let imported = StatementImporter.newTransactions(from: first, existing: [earlier])
+        XCTAssertEqual(imported.transactions.count, 2)
+        XCTAssertEqual(imported.duplicates, 0)
+        XCTAssertEqual(imported.transactions[0].categoryID, transport)
+        XCTAssertNil(imported.transactions[1].categoryID)
+
+        let again = StatementImporter.newTransactions(from: first, existing: [earlier] + imported.transactions)
+        XCTAssertEqual(again.transactions.count, 0)
+        XCTAssertEqual(again.duplicates, 2)
     }
 }

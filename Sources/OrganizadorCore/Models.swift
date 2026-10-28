@@ -120,6 +120,8 @@ public struct AppData: Codable, Hashable, Sendable {
     public var tasks: [TaskItem]
     public var habits: [Habit]
     public var habitChecks: [HabitCheck]
+    public var financeCategories: [FinanceCategory]
+    public var transactions: [MoneyTransaction]
     public var running: RunningTimer?
     public var preferences: Preferences
 
@@ -131,6 +133,8 @@ public struct AppData: Codable, Hashable, Sendable {
         tasks: [TaskItem] = [],
         habits: [Habit] = [],
         habitChecks: [HabitCheck] = [],
+        financeCategories: [FinanceCategory] = [],
+        transactions: [MoneyTransaction] = [],
         running: RunningTimer? = nil,
         preferences: Preferences = Preferences()
     ) {
@@ -141,6 +145,8 @@ public struct AppData: Codable, Hashable, Sendable {
         self.tasks = tasks
         self.habits = habits
         self.habitChecks = habitChecks
+        self.financeCategories = financeCategories
+        self.transactions = transactions
         self.running = running
         self.preferences = preferences
     }
@@ -148,7 +154,8 @@ public struct AppData: Codable, Hashable, Sendable {
     public static let empty = AppData()
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, activities, goals, sessions, tasks, habits, habitChecks, running, preferences
+        case schemaVersion, activities, goals, sessions, tasks, habits, habitChecks
+        case financeCategories, transactions, running, preferences
     }
 
     // Missing keys fall back to defaults, so files from older versions keep loading
@@ -164,6 +171,8 @@ public struct AppData: Codable, Hashable, Sendable {
             tasks: try container.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? [],
             habits: try container.decodeIfPresent([Habit].self, forKey: .habits) ?? [],
             habitChecks: try container.decodeIfPresent([HabitCheck].self, forKey: .habitChecks) ?? [],
+            financeCategories: try container.decodeIfPresent([FinanceCategory].self, forKey: .financeCategories) ?? [],
+            transactions: try container.decodeIfPresent([MoneyTransaction].self, forKey: .transactions) ?? [],
             running: try container.decodeIfPresent(RunningTimer.self, forKey: .running),
             preferences: try container.decodeIfPresent(Preferences.self, forKey: .preferences) ?? Preferences()
         )

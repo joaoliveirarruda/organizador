@@ -40,9 +40,11 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Tela "Agenda" com os próximos 7 dias.
 - Lê o Google Agenda (ou qualquer agenda que exporte iCal) pelo link secreto colado nos Ajustes, com eventos recorrentes, exceções e eventos cancelados. Atualiza a cada 15 min e guarda uma cópia para usar sem internet.
 
-## Próximos passos
+**Finanças:**
 
-1. Finanças: lançamentos, categorias, orçamento e importação de extrato.
+- Lançamentos manuais de despesas e receitas, com categoria.
+- Resumo do mês (receitas, despesas, saldo) e orçamento mensal por categoria, com aviso quando passa do limite.
+- Importação de extrato OFX ou CSV (formato brasileiro ou americano, inclusive o CSV da Nubank). Importar o mesmo arquivo de novo não duplica nada, e a categoria de um lançamento parecido é reaproveitada.
 
 ## Como rodar
 
@@ -58,7 +60,7 @@ Testes: `swift test`.
 
 | Pasta | O que tem |
 | --- | --- |
-| `Sources/OrganizadorCore` | Regras sem interface: modelos, cronômetro, estatísticas, metas, salvamento em JSON |
+| `Sources/OrganizadorCore` | Regras sem interface: modelos, cronômetro, estatísticas, metas, tarefas, hábitos, agenda iCal, finanças, salvamento em JSON |
 | `Sources/Organizador` | O app SwiftUI: janela, barra de menu, ajustes |
 | `Tests/OrganizadorCoreTests` | Testes do núcleo |
 
