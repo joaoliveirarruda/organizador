@@ -36,6 +36,9 @@ final class AppModel {
         if loadError == nil, loaded.activities.isEmpty, loaded.sessions.isEmpty {
             loaded.activities = Self.starterActivities()
         }
+        if loadError == nil, loaded.financeCategories.isEmpty {
+            loaded.financeCategories = Finance.defaultCategories()
+        }
 
         self.store = store
         self.agenda = CalendarFeed(
@@ -401,6 +404,67 @@ final class AppModel {
     func refreshCalendar() {
         guard hasCalendar else { return }
         agenda.refresh(urlString: data.preferences.calendarURL)
+    }
+
+    // MARK: - Finance
+
+    func financeCategory(_ id: UUID?) -> FinanceCategory? {
+        guard let id else { return nil }
+        return data.financeCategories.first { $0.id == id }
+    }
+
+    func month(containing date: Date) -> DateInterval {
+        Finance.month(containing: date, calendar: calendar)
+    }
+
+    func transactions(in month: DateInterval) -> [MoneyTransaction] {
+        Finance.transactions(data.transactions, in: month)
+    }
+
+    func monthSummary(_ month: DateInterval) -> MonthSummary {
+        Finance.summary(data.transactions, in: month)
+    }
+
+    /// Adds the transaction, or replaces the one with the same id.
+    func saveTransaction(_ transaction: MoneyTransaction) {
+        if let index = data.transactions.firstIndex(where: { $0.id == transaction.id }) {
+            data.transactions[index] = transaction
+        } else {
+            data.transactions.append(transaction)
+        }
+        persist()
+    }
+
+    func setCategory(_ categoryID: UUID?, forTransaction id: UUID) {
+        guard let index = data.transactions.firstIndex(where: { $0.id == id }) else { return }
+        data.transactions[index].categoryID = categoryID
+        persist()
+    }
+
+    func deleteTransaction(_ id: UUID) {
+        data.transactions.removeAll { $0.id == id }
+        persist()
+    }
+
+    /// Replaces all categories. Transactions in removed categories become uncategorized.
+    func saveFinanceCategories(_ categories: [FinanceCategory]) {
+        let kept = Set(categories.map(\.id))
+        for index in data.transactions.indices {
+            if let id = data.transactions[index].categoryID, !kept.contains(id) {
+                data.transactions[index].categoryID = nil
+            }
+        }
+        data.financeCategories = categories
+        persist()
+    }
+
+    /// Adds the statement lines not imported before. Returns how many were added and skipped.
+    @discardableResult
+    func importStatement(_ lines: [StatementLine]) -> (added: Int, duplicates: Int) {
+        let result = StatementImporter.newTransactions(from: lines, existing: data.transactions)
+        data.transactions.append(contentsOf: result.transactions)
+        persist()
+        return (result.transactions.count, result.duplicates)
     }
 
     // MARK: - Preferences
