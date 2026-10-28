@@ -5,14 +5,19 @@ import UniformTypeIdentifiers
 
 /// Notion-like neutral palette that follows the system's light and dark mode.
 enum Theme {
-    static let page = dynamic(light: 0xFFFFFF, dark: 0x191919)
-    static let sidebar = dynamic(light: 0xF7F7F5, dark: 0x202020)
-    static let hover = dynamic(light: 0xEBEBEA, dark: 0x2C2C2C)
-    static let text = dynamic(light: 0x37352F, dark: 0xE6E6E5)
-    static let secondaryText = dynamic(light: 0x787774, dark: 0x9B9B9B)
-    static let border = dynamic(light: 0xE9E9E7, dark: 0x2F2F2F)
-    static let card = dynamic(light: 0xFBFBFA, dark: 0x202020)
-    static let accent = Color(nsColor: NSColor(srgbRed: 0x23 / 255, green: 0x83 / 255, blue: 0xE2 / 255, alpha: 1))
+    static let page = Color(hex: "111417")
+    static let sidebar = Color(hex: "191d20")
+    static let hover = Color(hex: "252b2d")
+    static let text = Color(hex: "f0f2ef")
+    static let secondaryText = Color(hex: "a2adaa")
+    static let border = Color(hex: "303638")
+    static let card = Color(hex: "1d2225")
+    static let accent = Color(hex: "b8e2ca")
+    static let onAccent = Color(hex: "17352a")
+
+    static func font(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom("Inter", size: size).weight(weight)
+    }
 
     private static func dynamic(light: Int, dark: Int) -> Color {
         func color(_ hex: Int) -> NSColor {
@@ -61,7 +66,7 @@ struct IconView: View {
     var body: some View {
         switch icon {
         case .emoji(let emoji):
-            Text(emoji).font(.system(size: size * 0.95))
+            Text(emoji).font(Theme.font(size: size * 0.95))
                 .frame(width: size, height: size)
         case .image(let path):
             if let image = ImageFiles.image(path, in: base) {
@@ -78,7 +83,7 @@ struct IconView: View {
 
     private var symbol: some View {
         Image(systemName: fallback)
-            .font(.system(size: size * 0.8))
+            .font(Theme.font(size: size * 0.8))
             .foregroundStyle(Theme.secondaryText)
             .frame(width: size, height: size)
     }
@@ -145,7 +150,7 @@ struct PageHeader<Title: View>: View {
                 .opacity(hovering ? 1 : 0)
                 title
             }
-            .padding(.horizontal, 48)
+            .padding(.horizontal, 40)
             .padding(.top, cover == nil ? 32 : 12)
         }
         .onHover { hovering = $0 }
@@ -197,12 +202,54 @@ struct PageSection<Content: View, Accessory: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                Text(title).font(Theme.font(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
                 Spacer()
                 accessory
             }
             content
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+    }
+}
+
+struct ScreenHeading: View {
+    let section: String
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(section.uppercased())
+                .font(Theme.font(size: 10, weight: .semibold))
+                .foregroundStyle(Color(hex: "72817d"))
+            Text(title)
+                .font(Theme.font(size: 28, weight: .bold))
+                .foregroundStyle(Theme.text)
+            if let subtitle {
+                Text(subtitle).font(Theme.font(size: 14)).foregroundStyle(Theme.secondaryText)
+            }
+        }
+    }
+}
+
+struct AppActionButtonStyle: ButtonStyle {
+    var primary = false
+    var width: CGFloat = 260
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.font(size: 13, weight: .medium))
+            .foregroundStyle(primary ? Theme.onAccent : Theme.text)
+            .frame(width: width, height: 44)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(primary ? Theme.accent : Theme.hover)
+                    .opacity(configuration.isPressed ? 0.78 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

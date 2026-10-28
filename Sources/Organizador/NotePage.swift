@@ -64,7 +64,7 @@ struct TitleField: View {
     var body: some View {
         TextField("Título", text: $draft)
             .textFieldStyle(.plain)
-            .font(.system(size: 36, weight: .bold))
+            .font(Theme.font(size: 36, weight: .bold))
             .focused($focused)
             .onSubmit(commit)
             .onChange(of: focused) { if !focused { commit() } }

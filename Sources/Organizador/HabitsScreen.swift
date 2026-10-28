@@ -8,36 +8,25 @@ struct HabitsScreen: View {
 
     var body: some View {
         let tracker = model.habitTracker
-        Group {
-            if model.data.habits.isEmpty {
-                ContentUnavailableView {
-                    Label("Nenhum hábito ainda", systemImage: "repeat")
-                } description: {
-                    Text("Crie um hábito e marque os dias em que fez. Ele também pode ser marcado sozinho pelo cronômetro, como \"Ler 30 min\".")
-                } actions: {
-                    Button("Novo hábito") { addingHabit = true }
-                }
-            } else {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        ForEach(model.data.habits) { habit in
-                            HabitCard(habit: habit, tracker: tracker) { editingHabit = habit }
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ScreenHeading(section: "Hábitos", title: "Hábitos", subtitle: "Marque o dia ou deixe o tempo fazer a contagem.")
+                if model.data.habits.isEmpty {
+                    PageSection(title: "Nenhum hábito ainda") {
+                        Text("Crie um hábito e marque os dias em que fez. Ele também pode ser marcado sozinho pelo cronômetro.")
+                            .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                     }
-                    .padding(24)
-                    .frame(maxWidth: 720)
+                } else {
+                    ForEach(model.data.habits) { habit in
+                        HabitCard(habit: habit, tracker: tracker) { editingHabit = habit }
+                    }
                 }
+                Button("Novo hábito") { addingHabit = true }
+                    .buttonStyle(AppActionButtonStyle(primary: true))
             }
-        }
-        .navigationTitle("Hábitos")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    addingHabit = true
-                } label: {
-                    Label("Novo hábito", systemImage: "plus")
-                }
-            }
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .sheet(isPresented: $addingHabit) {
             HabitEditor(habit: nil)
@@ -53,6 +42,7 @@ struct HabitCard: View {
     let habit: Habit
     let tracker: HabitTracker
     let onEdit: () -> Void
+    @State private var showingConsistency = false
 
     var body: some View {
         let now = model.now
@@ -64,20 +54,13 @@ struct HabitCard: View {
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Button {
-                    model.toggleHabit(habit.id, on: now)
-                } label: {
-                    Image(systemName: doneToday ? "checkmark.circle.fill" : "circle")
-                        .font(.title)
-                        .foregroundStyle(color)
-                }
-                .buttonStyle(.plain)
-                .disabled(onlyByTimer)
-                .help(onlyByTimer ? "Feito hoje pelo cronômetro" : "Marcar hoje")
+                Image(systemName: doneToday ? "checkmark.circle.fill" : "circle")
+                    .font(.title3).foregroundStyle(color)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(habit.name).font(.title3.weight(.semibold))
-                    Text(subtitle).font(.callout).foregroundStyle(.secondary)
+                    Text("\(streak) \(streak == 1 ? "dia" : "dias") seguidos · \(Int((rate * 30).rounded())) de 30 dias")
+                        .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                 }
 
                 Spacer()
@@ -98,18 +81,32 @@ struct HabitCard: View {
                 .help("Editar hábito")
             }
 
-            HabitGrid(habit: habit, tracker: tracker, color: color, now: now)
-
-            Text("Últimos 30 dias: \(Int((rate * 100).rounded()))% dos dias")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(subtitle).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+            HStack(spacing: 16) {
+                Button(doneToday ? "Desmarcar hoje" : "Marcar hoje") { model.toggleHabit(habit.id, on: now) }
+                    .buttonStyle(.plain)
+                    .disabled(onlyByTimer)
+                Button("Ver constância   ›") { showingConsistency = true }.buttonStyle(.plain)
+                if onlyByTimer, let activityID = habit.autoActivityID {
+                    Button("Ver origem da marcação   ›") { model.route = .area(activityID) }.buttonStyle(.plain)
+                }
+            }
         }
-        .padding(16)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.06)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
         .contextMenu {
             Button("Editar", action: onEdit)
-            Button("Excluir", role: .destructive) { model.deleteHabit(habit.id) }
+        }
+        .sheet(isPresented: $showingConsistency) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(habit.name).font(.title2.weight(.semibold))
+                Text("Constância · últimas 12 semanas").foregroundStyle(Theme.secondaryText)
+                HabitGrid(habit: habit, tracker: tracker, color: color, now: now)
+                Button("Fechar") { showingConsistency = false }.keyboardShortcut(.cancelAction)
+            }
+            .padding(24)
+            .frame(width: 520)
         }
     }
 
@@ -177,6 +174,7 @@ struct HabitEditor: View {
     @State private var isAutomatic: Bool
     @State private var autoActivityID: UUID?
     @State private var autoMinutes: Int
+    @State private var confirmingDelete = false
 
     init(habit: Habit?) {
         self.habit = habit
@@ -213,10 +211,9 @@ struct HabitEditor: View {
                 }
             }
             HStack {
-                if let habit {
+                if habit != nil {
                     Button("Excluir", role: .destructive) {
-                        model.deleteHabit(habit.id)
-                        dismiss()
+                        confirmingDelete = true
                     }
                 }
                 Spacer()
@@ -229,6 +226,14 @@ struct HabitEditor: View {
         }
         .padding(20)
         .frame(width: 440)
+        .confirmationDialog("Excluir hábito?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            if let habit {
+                Button("Excluir hábito", role: .destructive) {
+                    model.deleteHabit(habit.id)
+                    dismiss()
+                }
+            }
+        }
     }
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }

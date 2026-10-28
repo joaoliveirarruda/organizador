@@ -3,7 +3,8 @@ import SwiftUI
 
 /// A page of the main window.
 enum Route: Hashable {
-    case home, search, timer, notes, tasks, habits, finance
+    case home, search, timer, agenda, notes, tasks, habits, finance, settings
+    case settingsSection(String)
     case goal(UUID)
     case area(UUID)
     case note(URL)
@@ -15,7 +16,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+                .navigationSplitViewColumnWidth(min: 232, ideal: 232, max: 232)
         } detail: {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -23,6 +24,7 @@ struct ContentView: View {
                 .foregroundStyle(Theme.text)
         }
         .onReceive(NotificationCenter.default.publisher(for: StaleNotifier.openHome)) { _ in model.route = .home }
+        .preferredColorScheme(.dark)
         .alert(
             "Algo deu errado",
             isPresented: Binding(
@@ -42,10 +44,13 @@ struct ContentView: View {
         case .home: HomeScreen()
         case .search: SearchScreen()
         case .timer: TimerScreen()
+        case .agenda: AgendaScreen()
         case .notes: NotesScreen()
         case .tasks: TasksScreen()
         case .habits: HabitsScreen()
         case .finance: FinanceScreen()
+        case .settings: PreferencesView()
+        case .settingsSection(let section): PreferencesView(section: section)
         case .goal(let id):
             if let goal = model.goal(id) { GoalPage(goal: goal) } else { missing }
         case .area(let id):
@@ -73,60 +78,49 @@ private struct Sidebar: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("organizador").font(Theme.font(size: 16, weight: .semibold))
+                    Text("SEU ESPAÇO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "72817d"))
+                }
+                .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 10)
                 SidebarRow(title: "Buscar", symbol: "magnifyingglass", route: .search)
-                SidebarRow(title: "Home", symbol: "house", route: .home)
+                SidebarRow(title: "Início", symbol: "house", route: .home)
                 SidebarRow(title: "Cronômetro", symbol: "timer", route: .timer)
-                SidebarRow(title: "Nova nota", symbol: "square.and.pencil", route: nil) {
-                    if let note = model.notes.create() { model.route = .note(note.url) }
-                }
+                SidebarRow(title: "Agenda", symbol: "calendar", route: .agenda)
+                SidebarRow(title: "Tarefas", symbol: "checklist", route: .tasks)
+                SidebarRow(title: "Hábitos", symbol: "repeat", route: .habits)
+                SidebarRow(title: "Notas", symbol: "note.text", route: .notes)
+                SidebarRow(title: "Finanças", symbol: "dollarsign.circle", route: .finance)
 
-                if let running = model.runningActivity {
-                    RunningPill(area: running).padding(.vertical, 8)
-                }
-
-                header("Objetivos") {
-                    Button { addingGoal = true } label: { Image(systemName: "plus") }
-                        .buttonStyle(.borderless)
-                        .help("Novo objetivo")
-                }
+                header("Objetivos") { EmptyView() }
                 ForEach(model.activeGoals) { goal in
                     SidebarRow(title: goal.title, icon: goal.icon, base: model.imagesFolder, fallback: "flag", route: .goal(goal.id))
                 }
                 if model.activeGoals.isEmpty {
                     Text("Nenhum objetivo ativo").font(.callout).foregroundStyle(Theme.secondaryText).padding(.horizontal, 10)
                 }
-                if !model.inactiveGoals.isEmpty {
-                    SidebarRow(
-                        title: "Pausados e encerrados (\(model.inactiveGoals.count))",
-                        symbol: showInactive ? "chevron.down" : "chevron.right", route: nil
-                    ) { showInactive.toggle() }
-                    if showInactive {
-                        ForEach(model.inactiveGoals) { goal in
-                            SidebarRow(title: goal.title, icon: goal.icon, base: model.imagesFolder, fallback: "flag", route: .goal(goal.id))
-                                .opacity(0.7)
-                        }
+                SidebarRow(
+                    title: "Pausados e encerrados",
+                    symbol: showInactive ? "chevron.down" : "chevron.right", route: nil
+                ) { showInactive.toggle() }
+                if showInactive {
+                    ForEach(model.inactiveGoals) { goal in
+                        SidebarRow(title: goal.title, icon: goal.icon, base: model.imagesFolder, fallback: "flag", route: .goal(goal.id))
+                            .opacity(0.7)
                     }
                 }
+                SidebarRow(title: "+ Novo objetivo", symbol: "plus", route: nil) { addingGoal = true }
 
                 header("Recentes") { EmptyView() }
                 ForEach(model.notes.notes.sorted { $0.modifiedAt > $1.modifiedAt }.prefix(6)) { note in
                     SidebarRow(title: note.title, icon: note.icon, base: model.notes.folder, route: .note(note.url))
                 }
 
-                header("Mais") { EmptyView() }
-                SidebarRow(title: "Todas as notas", symbol: "note.text", route: .notes)
-                SidebarRow(title: "Tarefas", symbol: "checklist", route: .tasks)
-                SidebarRow(title: "Hábitos", symbol: "repeat", route: .habits)
-                SidebarRow(title: "Finanças", symbol: "dollarsign.circle", route: .finance)
             }
-            .padding(8)
+            .padding(16)
         }
         .safeAreaInset(edge: .bottom) {
-            SettingsLink { Label("Ajustes", systemImage: "gearshape") }
-                .buttonStyle(.borderless)
-                .foregroundStyle(Theme.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
+            SidebarRow(title: "Ajustes", symbol: "gearshape", route: .settings).padding(8)
         }
         .background(Theme.sidebar)
         .foregroundStyle(Theme.text)
@@ -135,7 +129,7 @@ private struct Sidebar: View {
 
     private func header<Accessory: View>(_ title: String, @ViewBuilder accessory: () -> Accessory) -> some View {
         HStack {
-            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+            Text(title).font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
             Spacer()
             accessory()
         }
@@ -185,37 +179,13 @@ private struct SidebarRow: View {
                 Text(title).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .font(.system(size: 14, weight: selected ? .medium : .regular))
+            .font(Theme.font(size: 13, weight: selected ? .medium : .regular))
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 6).fill(selected || hovering ? Theme.hover : .clear))
+            .frame(height: 34)
+            .background(RoundedRectangle(cornerRadius: 7).fill(selected || hovering ? Theme.hover : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-    }
-}
-
-/// The running timer, always in view.
-private struct RunningPill: View {
-    @Environment(AppModel.self) private var model
-    let area: Activity
-
-    var body: some View {
-        let color = Color(hex: area.colorHex)
-        HStack(spacing: 8) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Button(area.name) { model.route = .area(area.id) }
-                .buttonStyle(.plain).lineLimit(1)
-            Spacer(minLength: 0)
-            Text(DurationFormat.clock(model.currentElapsed)).monospacedDigit().foregroundStyle(Theme.secondaryText)
-            Button { model.toggle(area.id) } label: { Image(systemName: "pause.fill") }
-                .buttonStyle(.borderless)
-                .help("Pausar")
-        }
-        .font(.system(size: 13))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8).fill(color.opacity(0.15)))
     }
 }

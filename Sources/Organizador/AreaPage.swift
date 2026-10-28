@@ -18,22 +18,25 @@ struct AreaPage: View {
             .sorted { $0.start > $1.start }
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 14) {
                 PageHeader(
                     icon: area.icon, cover: area.cover, base: model.imagesFolder, fallback: "circle.fill",
                     imagesFolder: model.imagesFolder,
                     setIcon: { icon in update { $0.icon = icon } },
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
-                    Text(area.name).font(.system(size: 36, weight: .bold))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("ÁREA").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        Text(area.name).font(Theme.font(size: 28, weight: .bold))
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 10) {
                         Button(isRunning ? "Pausar" : "Começar", systemImage: isRunning ? "pause.fill" : "play.fill") {
                             model.toggle(area.id)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(AppActionButtonStyle(primary: true))
                         .tint(Color(hex: area.colorHex))
                         if let goal {
                             Button { model.route = .goal(goal.id) } label: {
@@ -47,9 +50,11 @@ struct AreaPage: View {
                         Button("Editar") { editing = true }
                     }
 
-                    HStack(spacing: 32) {
-                        stat("Hoje", model.todayTotal(for: area.id))
-                        stat("Nesta semana", model.weekTotal(for: area.id))
+                    PageSection(title: "Resumo") {
+                        HStack(spacing: 32) {
+                            stat("Hoje", model.todayTotal(for: area.id))
+                            stat("Nesta semana", model.weekTotal(for: area.id))
+                        }
                     }
 
                     PageSection(title: "Sessões dos últimos 7 dias") {
@@ -66,10 +71,10 @@ struct AreaPage: View {
                             .buttonStyle(.borderless)
                     }
                 }
-                .padding(.horizontal, 48)
+                .padding(.horizontal, 40)
             }
-            .padding(.bottom, 48)
-            .frame(maxWidth: 900, alignment: .leading)
+            .padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .sheet(isPresented: $editing) { ActivityEditor(activity: area) }
