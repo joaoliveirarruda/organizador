@@ -906,3 +906,20 @@ final class SessionEventTests: XCTestCase {
         XCTAssertEqual(SessionEvent.make(session, area: area, goal: nil).title, "⏱ E-mails")
     }
 }
+
+final class AreaModelTests: XCTestCase {
+    func testOldFileWithoutAreasStillLoads() throws {
+        let json = ##"{"schemaVersion":2,"activities":[{"id":"\##(UUID().uuidString)","name":"CS229","colorHex":"#2D98DA","isArchived":false,"createdAt":0}]}"##
+        let data = try JSONDecoder().decode(AppData.self, from: Data(json.utf8))
+        XCTAssertEqual(data.areas, [])
+        XCTAssertNil(data.activities.first?.areaID)
+    }
+
+    func testAreaAndActivityLinkRoundTrip() throws {
+        let area = Area(name: "Universidade", colorHex: "#2D98DA")
+        let original = AppData(activities: [Activity(name: "CS229", colorHex: "#2D98DA", areaID: area.id)], areas: [area])
+        let decoded = try JSONDecoder().decode(AppData.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(decoded.areas, [area])
+        XCTAssertEqual(decoded.activities.first?.areaID, area.id)
+    }
+}
