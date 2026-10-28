@@ -128,7 +128,7 @@ struct StartBox: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Começar agora").font(Theme.font(size: 14, weight: .semibold))
-            Text("Escolha uma área; só iniciaremos quando você confirmar.")
+            Text("Escolha uma atividade; só iniciaremos quando você confirmar.")
                 .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
             if let running = model.runningActivity {
                 HStack(spacing: 8) {
@@ -146,7 +146,7 @@ struct StartBox: View {
                             .foregroundStyle(Color(hex: area.colorHex))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(area.name).foregroundStyle(Theme.text)
-                            Text(area.goalID.flatMap(model.goal)?.title ?? "Área independente")
+                            Text(area.goalID.flatMap(model.goal)?.title ?? "Atividade independente")
                                 .font(Theme.font(size: 10)).foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
@@ -157,7 +157,7 @@ struct StartBox: View {
                 }
                 .buttonStyle(.plain)
             }
-            Button("Criar e começar outra área   ›") { showingNewActivity = true }
+            Button("Criar e começar outra atividade   ›") { showingNewActivity = true }
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.text)
         }

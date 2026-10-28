@@ -27,9 +27,9 @@ struct TimerScreen: View {
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                 }
 
-                PageSection(title: "Áreas") {
+                PageSection(title: "Atividades") {
                     if model.activeActivities.isEmpty {
-                        Text("Crie uma área para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
+                        Text("Crie uma atividade para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
                     }
                     ForEach(model.activeActivities) { area in
                         AreaTimerRow(area: area)
@@ -50,7 +50,7 @@ struct TimerScreen: View {
                         HStack {
                             Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
                                 .monospacedDigit().foregroundStyle(Theme.secondaryText)
-                            Text(model.activity(session.activityID)?.name ?? "Área removida")
+                            Text(model.activity(session.activityID)?.name ?? "Atividade removida")
                             Spacer()
                             Text(DurationFormat.short(session.duration)).foregroundStyle(Theme.secondaryText)
                         }
@@ -60,15 +60,15 @@ struct TimerScreen: View {
                 }
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                    Button(model.runningActivity.map { "Pausar \($0.name)" } ?? "Iniciar \(model.activeActivities.first?.name ?? "área")") {
+                    Button(model.runningActivity.map { "Pausar \($0.name)" } ?? "Iniciar \(model.activeActivities.first?.name ?? "atividade")") {
                         if let running = model.runningActivity { model.toggle(running.id) }
                         else if let first = model.activeActivities.first { model.start(first.id) }
                     }
                     .buttonStyle(AppActionButtonStyle(primary: true))
                     .disabled(model.runningActivity == nil && model.activeActivities.isEmpty)
-                    Button("Trocar de área") { choosingActivity = true }
+                    Button("Trocar de atividade") { choosingActivity = true }
                         .buttonStyle(AppActionButtonStyle())
-                    Button("Nova área") { showingNewActivity = true }.buttonStyle(AppActionButtonStyle())
+                    Button("Nova atividade") { showingNewActivity = true }.buttonStyle(AppActionButtonStyle())
                     Button("Adicionar sessão") { addingSession = true }
                         .buttonStyle(AppActionButtonStyle())
                         .disabled(model.activeActivities.isEmpty)
@@ -90,7 +90,7 @@ struct TimerScreen: View {
             ActivityChooser(activities: model.activeActivities) { model.start($0.id) }
         }
         .confirmationDialog(
-            "Arquivar área?",
+            "Arquivar atividade?",
             isPresented: Binding(get: { archivingActivity != nil }, set: { if !$0 { archivingActivity = nil } }),
             titleVisibility: .visible,
             presenting: archivingActivity
@@ -113,8 +113,8 @@ private struct ActivityChooser: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ScreenHeading(section: "Cronômetro", title: "Escolha uma área", subtitle: "Selecione uma área antes de iniciar.")
-            PageSection(title: "Áreas") {
+            ScreenHeading(section: "Cronômetro", title: "Escolha uma atividade", subtitle: "Selecione uma atividade antes de iniciar.")
+            PageSection(title: "Atividades") {
                 ForEach(activities) { activity in
                     Button { selectedID = activity.id } label: {
                         HStack {
@@ -342,7 +342,7 @@ struct ActivityEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(activity == nil ? "Nova área" : "Editar área").font(.headline)
+            Text(activity == nil ? "Nova atividade" : "Editar atividade").font(.headline)
             TextField("Nome", text: $name)
                 .textFieldStyle(.roundedBorder)
             HStack(spacing: 8) {
@@ -364,7 +364,7 @@ struct ActivityEditor: View {
                 Button("Nova área…") { addingArea = true }
             }
             Picker("Conta para o objetivo", selection: $goalID) {
-                Text("Nenhum (área solta)").tag(UUID?.none)
+                Text("Nenhum (atividade solta)").tag(UUID?.none)
                 ForEach(model.activeGoals) { goal in
                     Text(goal.title).tag(Optional(goal.id))
                 }

@@ -44,7 +44,7 @@ struct AreaPage: View {
                             }
                             .buttonStyle(.borderless)
                         } else {
-                            Text("Área solta").foregroundStyle(Theme.secondaryText)
+                            Text("Atividade solta").foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
                         Button("Editar") { editing = true }
@@ -106,7 +106,7 @@ struct SessionRow: View {
             Circle()
                 .fill(Color(hex: activity?.colorHex ?? ""))
                 .frame(width: 10, height: 10)
-            Text(activity?.name ?? "Área removida")
+            Text(activity?.name ?? "Atividade removida")
             Spacer()
             Text("\(session.start.formatted(.dateTime.weekday(.abbreviated).day().hour().minute()))–\(session.end.formatted(date: .omitted, time: .shortened))")
                 .foregroundStyle(.secondary)
@@ -137,7 +137,7 @@ struct SessionEditor: View {
         VStack(alignment: .leading, spacing: 16) {
             Text(session == nil ? "Adicionar sessão" : "Editar sessão").font(.headline)
             Form {
-                Picker("Área", selection: $activityID) {
+                Picker("Atividade", selection: $activityID) {
                     ForEach(choices) { activity in
                         Text(activity.name).tag(Optional(activity.id))
                     }

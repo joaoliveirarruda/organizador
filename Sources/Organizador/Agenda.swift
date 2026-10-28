@@ -33,7 +33,7 @@ struct AgendaScreen: View {
                             HStack {
                                 Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
                                     .monospacedDigit().foregroundStyle(Theme.secondaryText)
-                                Text(model.activity(session.activityID)?.name ?? "Área removida")
+                                Text(model.activity(session.activityID)?.name ?? "Atividade removida")
                                 Spacer()
                                 Text(DurationFormat.short(session.duration)).font(.caption).foregroundStyle(Theme.secondaryText)
                             }

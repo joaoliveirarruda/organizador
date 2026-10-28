@@ -102,7 +102,7 @@ struct PreferencesView: View {
                 if preferences.exportSessionsToCalendar {
                     CalendarExportStatus()
                 }
-                Text("O evento leva a área, o objetivo e o horário de início e fim. Com sua conta Google adicionada em Ajustes do Sistema › Contas de Internet, ele aparece também no Google Agenda. Sessões antigas não são exportadas.")
+                Text("O evento leva a atividade, o objetivo e o horário de início e fim. Com sua conta Google adicionada em Ajustes do Sistema › Contas de Internet, ele aparece também no Google Agenda. Sessões antigas não são exportadas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

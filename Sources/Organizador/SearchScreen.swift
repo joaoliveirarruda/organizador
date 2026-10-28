@@ -11,8 +11,8 @@ struct SearchScreen: View {
         let text = query.trimmingCharacters(in: .whitespaces)
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                ScreenHeading(section: "Busca", title: "Buscar em todo o espaço", subtitle: "Encontre notas, objetivos, áreas e tarefas.")
-                TextField("Buscar notas, objetivos, áreas e tarefas", text: $query)
+                ScreenHeading(section: "Busca", title: "Buscar em todo o espaço", subtitle: "Encontre notas, objetivos, atividades e tarefas.")
+                TextField("Buscar notas, objetivos, atividades e tarefas", text: $query)
                     .textFieldStyle(.plain)
                     .font(Theme.font(size: 16))
                     .focused($focused)
@@ -51,7 +51,7 @@ struct SearchScreen: View {
             }
         }
         if !areas.isEmpty {
-            PageSection(title: "Áreas") {
+            PageSection(title: "Atividades") {
                 ForEach(areas) { area in
                     row(area.name, icon: IconView(icon: area.icon, base: model.imagesFolder, fallback: "circle.fill")) {
                         model.route = .area(area.id)

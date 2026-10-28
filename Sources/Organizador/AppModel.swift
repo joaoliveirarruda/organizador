@@ -218,7 +218,7 @@ final class AppModel {
         guard idle >= TimeInterval(data.preferences.idlePauseMinutes * 60) else { return }
         let lastInput = max(running.startedAt, now.addingTimeInterval(-idle))
         stop(at: lastInput)
-        let name = activity(running.activityID)?.name ?? "A área"
+        let name = activity(running.activityID)?.name ?? "A atividade"
         pauseNotice = "\(name) foi pausada por inatividade às \(lastInput.formatted(date: .omitted, time: .shortened))."
     }
 
