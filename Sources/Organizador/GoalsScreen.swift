@@ -62,6 +62,7 @@ struct GoalCard: View {
         let progress = model.progress(for: goal)
         let activities = model.activities(forGoal: goal.id)
         let status = statusLine(progress)
+        let tasks = model.taskCounts(forGoal: goal.id)
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
@@ -86,6 +87,12 @@ struct GoalCard: View {
             Text(status.text)
                 .font(.callout)
                 .foregroundStyle(status.color)
+
+            if tasks.total > 0 {
+                Label("\(tasks.done) de \(tasks.total) tarefas concluídas", systemImage: "checklist")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             if activities.isEmpty {
                 Text("Nenhuma atividade ligada. Clique para escolher.")

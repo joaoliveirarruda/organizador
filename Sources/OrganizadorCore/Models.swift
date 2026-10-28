@@ -113,6 +113,7 @@ public struct AppData: Codable, Hashable, Sendable {
     public var activities: [Activity]
     public var goals: [Goal]
     public var sessions: [FocusSession]
+    public var tasks: [TaskItem]
     public var running: RunningTimer?
     public var preferences: Preferences
 
@@ -121,6 +122,7 @@ public struct AppData: Codable, Hashable, Sendable {
         activities: [Activity] = [],
         goals: [Goal] = [],
         sessions: [FocusSession] = [],
+        tasks: [TaskItem] = [],
         running: RunningTimer? = nil,
         preferences: Preferences = Preferences()
     ) {
@@ -128,6 +130,7 @@ public struct AppData: Codable, Hashable, Sendable {
         self.activities = activities
         self.goals = goals
         self.sessions = sessions
+        self.tasks = tasks
         self.running = running
         self.preferences = preferences
     }
@@ -135,7 +138,7 @@ public struct AppData: Codable, Hashable, Sendable {
     public static let empty = AppData()
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, activities, goals, sessions, running, preferences
+        case schemaVersion, activities, goals, sessions, tasks, running, preferences
     }
 
     // Missing keys fall back to defaults, so files from older versions keep loading
@@ -148,6 +151,7 @@ public struct AppData: Codable, Hashable, Sendable {
             activities: try container.decodeIfPresent([Activity].self, forKey: .activities) ?? [],
             goals: try container.decodeIfPresent([Goal].self, forKey: .goals) ?? [],
             sessions: try container.decodeIfPresent([FocusSession].self, forKey: .sessions) ?? [],
+            tasks: try container.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? [],
             running: try container.decodeIfPresent(RunningTimer.self, forKey: .running),
             preferences: try container.decodeIfPresent(Preferences.self, forKey: .preferences) ?? Preferences()
         )
