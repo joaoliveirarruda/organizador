@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A page of the main window.
 enum Route: Hashable {
-    case home, search, timer, report, agenda, notes, tasks, habits, finance, settings
+    case home, search, timer, report, notes, tasks, habits, finance, settings
     case settingsSection(String)
     case goal(UUID)
     case area(UUID)
@@ -47,7 +47,6 @@ struct ContentView: View {
         case .search: SearchScreen()
         case .timer: TimerScreen()
         case .report: ReportScreen()
-        case .agenda: AgendaScreen()
         case .notes: NotesScreen()
         case .tasks: TasksScreen()
         case .habits: HabitsScreen()
@@ -84,16 +83,13 @@ private struct Sidebar: View {
             VStack(alignment: .leading, spacing: 1) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("organizador").font(Theme.font(size: 16, weight: .semibold))
-                    Text("SEU ESPAÇO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Color(hex: "72817d"))
+                    Text("SEU ESPAÇO").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                 }
                 .padding(.horizontal, 10).padding(.top, 8).padding(.bottom, 10)
                 SidebarRow(title: "Buscar", symbol: "magnifyingglass", route: .search)
-                SidebarRow(title: "Início", symbol: "house", route: .home)
-                SidebarRow(title: "Cronômetro", symbol: "timer", route: .timer)
-                SidebarRow(title: "Relatório", symbol: "chart.bar", route: .report)
-                SidebarRow(title: "Agenda", symbol: "calendar", route: .agenda)
+                SidebarRow(title: "Hoje", symbol: "sun.max", route: .home, also: [.habits])
+                SidebarRow(title: "Tempo", symbol: "timer", route: .timer, also: [.report])
                 SidebarRow(title: "Tarefas", symbol: "checklist", route: .tasks)
-                SidebarRow(title: "Hábitos", symbol: "repeat", route: .habits)
                 SidebarRow(title: "Notas", symbol: "note.text", route: .notes)
                 SidebarRow(title: "Finanças", symbol: "dollarsign.circle", route: .finance)
 
@@ -168,15 +164,18 @@ private struct SidebarRow: View {
     var base: URL?
     var fallback = "doc.text"
     let route: Route?
+    /// Other pages that live under this row, so it stays highlighted on them.
+    var also: [Route] = []
     var action: (() -> Void)?
     /// Actions shown behind a "…" button while the pointer is over the row.
     var menu: AnyView?
     @State private var hovering = false
 
-    init(title: String, symbol: String, route: Route?, action: (() -> Void)? = nil) {
+    init(title: String, symbol: String, route: Route?, also: [Route] = [], action: (() -> Void)? = nil) {
         self.title = title
         self.symbol = symbol
         self.route = route
+        self.also = also
         self.action = action
     }
 
@@ -194,7 +193,7 @@ private struct SidebarRow: View {
     }
 
     var body: some View {
-        let selected = route != nil && model.route == route
+        let selected = route != nil && (model.route == route || also.contains(model.route))
         Button {
             if let action { action() } else if let route { model.route = route }
         } label: {

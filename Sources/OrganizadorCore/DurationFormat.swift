@@ -10,8 +10,9 @@ public enum DurationFormat {
         return String(format: "%d:%02d:%02d", hours, minutes, secs)
     }
 
-    /// "3h 15min", "3h", "15min"
+    /// "3h 15min", "3h", "15min", "<1min" for a few seconds
     public static func short(_ seconds: TimeInterval) -> String {
+        if seconds > 0 && seconds < 60 { return "<1min" }
         let totalMinutes = max(0, Int((seconds / 60).rounded(.down)))
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60

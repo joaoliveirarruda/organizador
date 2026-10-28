@@ -10,23 +10,25 @@ struct HabitsScreen: View {
         let tracker = model.habitTracker
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeading(section: "Hábitos", title: "Hábitos", subtitle: "Marque o dia ou deixe o tempo fazer a contagem.")
+                ScreenHeading(section: "Hoje", title: "Hábitos", subtitle: "Marque o dia ou deixe o tempo fazer a contagem.") {
+                    Button("Novo hábito") { addingHabit = true }
+                        .buttonStyle(.heading(primary: true))
+                        .keyboardShortcut("n")
+                }
                 if model.data.habits.isEmpty {
                     PageSection(title: "Nenhum hábito ainda") {
                         Text("Crie um hábito e marque os dias em que fez. Ele também pode ser marcado sozinho pelo cronômetro.")
                             .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                        Button("Criar primeiro hábito") { addingHabit = true }.buttonStyle(.heading(primary: true))
                     }
                 } else {
                     ForEach(model.data.habits) { habit in
                         HabitCard(habit: habit, tracker: tracker) { editingHabit = habit }
                     }
                 }
-                Button("Novo hábito") { addingHabit = true }
-                    .buttonStyle(AppActionButtonStyle(primary: true))
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
         .sheet(isPresented: $addingHabit) {
             HabitEditor(habit: nil)
@@ -81,7 +83,7 @@ struct HabitCard: View {
                 .help("Editar hábito")
             }
 
-            Text(subtitle).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+            Text(subtitle).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
             HStack(spacing: 16) {
                 Button(doneToday ? "Desmarcar hoje" : "Marcar hoje") { model.toggleHabit(habit.id, on: now) }
                     .buttonStyle(.plain)

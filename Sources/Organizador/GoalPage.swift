@@ -23,7 +23,7 @@ struct GoalPage: View {
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("OBJETIVO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        Text("OBJETIVO").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(goal.title).font(Theme.font(size: 28, weight: .bold))
                             if let thread { StateBadge(state: thread.state) }
@@ -43,8 +43,7 @@ struct GoalPage: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .pageColumn()
         }
         .sheet(isPresented: $editing) { GoalEditor(goal: goal) }
         .sheet(isPresented: $addingArea) { ActivityEditor(activity: nil, goalID: goal.id) }
@@ -60,31 +59,52 @@ struct GoalPage: View {
         HStack(spacing: 10) {
             let running = model.running.flatMap { running in areas.first { $0.id == running.activityID } }
             if let running {
-                Button("Pausar \(running.name)") { model.toggle(running.id) }
-                    .buttonStyle(AppActionButtonStyle(primary: true))
+                Button("Pausar \(running.name)", systemImage: "pause.fill") { model.toggle(running.id) }
+                    .buttonStyle(.heading(primary: true))
             } else if areas.count == 1 {
-                Button("Trabalhar neste objetivo") { model.start(areas[0].id) }
-                    .buttonStyle(AppActionButtonStyle(primary: true))
+                Button("Trabalhar neste objetivo", systemImage: "play.fill") { model.start(areas[0].id) }
+                    .buttonStyle(.heading(primary: true))
             } else if areas.isEmpty {
                 Button("Criar atividade para cronometrar", systemImage: "plus") { addingArea = true }
+                    .buttonStyle(.heading(primary: true))
             } else {
                 Menu {
                     ForEach(areas) { area in
                         Button(area.name) { model.start(area.id) }
                     }
                 } label: {
-                    Label("Trabalhar nisso", systemImage: "play.fill")
+                    menuLabel("Trabalhar nisso", systemImage: "play.fill")
                 }
-                .fixedSize()
+                .menuStyle(.button).buttonStyle(.heading(primary: true)).menuIndicator(.hidden).fixedSize()
             }
             Spacer()
-            Menu("Estado") {
+            Menu {
                 Button("Ativo") { model.setGoalStatus(goal.id, .active) }
                 Button("Pausar") { model.setGoalStatus(goal.id, .paused) }
                 Button("Encerrar") { model.setGoalStatus(goal.id, .closed) }
+            } label: {
+                menuLabel(statusTitle)
             }
-            .fixedSize()
-            Button("Editar") { editing = true }
+            .menuStyle(.button).buttonStyle(.heading()).menuIndicator(.hidden).fixedSize()
+            .help("Estado do objetivo")
+            Button("Editar") { editing = true }.buttonStyle(.heading())
+        }
+    }
+
+    private var statusTitle: String {
+        switch goal.status {
+        case .active: "Ativo"
+        case .paused: "Pausado"
+        case .closed: "Encerrado"
+        }
+    }
+
+    /// A menu's label with a small chevron, since the system indicator does not take the app's style.
+    private func menuLabel(_ title: String, systemImage: String? = nil) -> some View {
+        HStack(spacing: 6) {
+            if let systemImage { Image(systemName: systemImage) }
+            Text(title)
+            Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
         }
     }
 

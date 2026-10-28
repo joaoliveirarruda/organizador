@@ -8,7 +8,6 @@ struct TimerScreen: View {
     @State private var showingNewActivity = false
     @State private var editingActivity: Activity?
     @State private var addingSession = false
-    @State private var choosingActivity = false
     @State private var archivingActivity: Activity?
 
     var body: some View {
@@ -28,57 +27,26 @@ struct TimerScreen: View {
                 }
 
                 PageSection(title: "Atividades") {
-                    if model.activeActivities.isEmpty {
-                        Text("Crie uma atividade para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
-                    }
-                    ForEach(model.activeActivities) { area in
-                        AreaTimerRow(area: area)
-                            .contextMenu {
-                                Button("Abrir") { model.route = .area(area.id) }
-                                Button("Editar") { editingActivity = area }
-                                Button("Arquivar", role: .destructive) { archivingActivity = area }
-                            }
-                    }
+                    activities
+                } accessory: {
+                    Button("Atividade", systemImage: "plus") { showingNewActivity = true }
+                        .buttonStyle(.heading())
+                        .keyboardShortcut("n")
                 }
 
                 PageSection(title: "Sessões de hoje") {
-                    let sessions = model.data.sessions.filter { model.calendar.isDate($0.start, inSameDayAs: model.now) }.sorted { $0.start < $1.start }
-                    if sessions.isEmpty {
-                        Text("Nenhuma sessão registrada hoje.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
-                    }
-                    ForEach(sessions) { session in
-                        HStack {
-                            Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
-                                .monospacedDigit().foregroundStyle(Theme.secondaryText)
-                            Text(model.activity(session.activityID)?.name ?? "Atividade removida")
-                            Spacer()
-                            Text(DurationFormat.short(session.duration)).foregroundStyle(Theme.secondaryText)
-                        }
-                        .font(Theme.font(size: 12))
-                        .padding(.vertical, 5)
-                    }
-                }
-
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                    Button(model.runningActivity.map { "Pausar \($0.name)" } ?? "Iniciar \(model.activeActivities.first?.name ?? "atividade")") {
-                        if let running = model.runningActivity { model.toggle(running.id) }
-                        else if let first = model.activeActivities.first { model.start(first.id) }
-                    }
-                    .buttonStyle(AppActionButtonStyle(primary: true))
-                    .disabled(model.runningActivity == nil && model.activeActivities.isEmpty)
-                    Button("Trocar de atividade") { choosingActivity = true }
-                        .buttonStyle(AppActionButtonStyle())
-                    Button("Nova atividade") { showingNewActivity = true }.buttonStyle(AppActionButtonStyle())
-                    Button("Adicionar sessão") { addingSession = true }
-                        .buttonStyle(AppActionButtonStyle())
+                    sessions
+                } accessory: {
+                    Button("Sessão", systemImage: "plus") { addingSession = true }
+                        .buttonStyle(.heading())
                         .disabled(model.activeActivities.isEmpty)
-                    Button("Agenda do dia") { model.route = .agenda }.buttonStyle(AppActionButtonStyle())
+                        .help("Registrar uma sessão que o cronômetro não pegou")
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
+        .toolbar { ToolbarItem(placement: .principal) { TimeTabs() } }
         .sheet(isPresented: $showingNewActivity) {
             ActivityEditor(activity: nil)
         }
@@ -86,9 +54,6 @@ struct TimerScreen: View {
             ActivityEditor(activity: activity)
         }
         .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
-        .sheet(isPresented: $choosingActivity) {
-            ActivityChooser(activities: model.activeActivities) { model.start($0.id) }
-        }
         .confirmationDialog(
             "Arquivar atividade?",
             isPresented: Binding(get: { archivingActivity != nil }, set: { if !$0 { archivingActivity = nil } }),
@@ -103,47 +68,52 @@ struct TimerScreen: View {
             Text("As sessões registradas serão mantidas.")
         }
     }
-}
 
-private struct ActivityChooser: View {
-    @Environment(\.dismiss) private var dismiss
-    let activities: [Activity]
-    let select: (Activity) -> Void
-    @State private var selectedID: UUID?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ScreenHeading(section: "Cronômetro", title: "Escolha uma atividade", subtitle: "Selecione uma atividade antes de iniciar.")
-            PageSection(title: "Atividades") {
-                ForEach(activities) { activity in
-                    Button { selectedID = activity.id } label: {
-                        HStack {
-                            Text(activity.name).foregroundStyle(Theme.text)
-                            Spacer()
-                            Image(systemName: selectedID == activity.id ? "largecircle.fill.circle" : "circle")
-                                .foregroundStyle(selectedID == activity.id ? Theme.accent : Theme.secondaryText)
-                        }
-                        .padding(.vertical, 5)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            HStack(spacing: 8) {
-                Button("Cancelar") { dismiss() }.buttonStyle(AppActionButtonStyle())
-                Button("Iniciar") {
-                    if let activity = activities.first(where: { $0.id == selectedID }) { select(activity) }
-                    dismiss()
-                }
-                .buttonStyle(AppActionButtonStyle(primary: true))
-                .disabled(selectedID == nil)
-            }
+    @ViewBuilder
+    private var activities: some View {
+        if model.activeActivities.isEmpty {
+            Text("Crie uma atividade para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
         }
-        .padding(24)
-        .frame(width: 520)
+        ForEach(model.activeActivities) { area in
+            AreaTimerRow(area: area)
+                .contextMenu {
+                    Button("Abrir") { model.route = .area(area.id) }
+                    Button("Editar") { editingActivity = area }
+                    Button("Arquivar", role: .destructive) { archivingActivity = area }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var sessions: some View {
+        let sessions = model.data.sessions.filter { model.calendar.isDate($0.start, inSameDayAs: model.now) }.sorted { $0.start < $1.start }
+        if sessions.isEmpty {
+            Text("Nenhuma sessão registrada hoje.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+        }
+        ForEach(sessions) { session in
+            HStack {
+                Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
+                    .monospacedDigit().foregroundStyle(Theme.secondaryText)
+                Text(model.activity(session.activityID)?.name ?? "Atividade removida")
+                Spacer()
+                Text(DurationFormat.short(session.duration)).foregroundStyle(Theme.secondaryText)
+            }
+            .font(Theme.font(size: 12))
+            .padding(.vertical, 5)
+        }
     }
 }
 
-/// Today's total, tinted with the running area's color, plus the D-day and the daily target.
+/// Cronômetro and Relatório are two views of the same timed sessions, under one "Tempo" in the sidebar.
+struct TimeTabs: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+        SegmentedTabs(options: [(Route.timer, "Cronômetro"), (Route.report, "Relatório")], selection: $model.route)
+    }
+}
+
 private struct TimerHeader: View {
     @Environment(AppModel.self) private var model
 
@@ -153,8 +123,8 @@ private struct TimerHeader: View {
         let running = model.runningActivity
         let goal = running?.goalID.flatMap(model.goal)
         ScreenHeading(
-            section: "Cronômetro",
-            title: "Seu tempo",
+            section: "Tempo",
+            title: "Cronômetro",
             subtitle: "Hoje · \(DurationFormat.short(total))" + (target > 0 ? " de uma meta de \(DurationFormat.short(target))" : "") + (goal.map { " · \($0.title)" } ?? "")
         )
     }

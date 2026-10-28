@@ -26,7 +26,7 @@ struct AreaPage: View {
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ÁREA").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        Text("ÁREA").font(Theme.font(size: 11, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                         Text(area.name).font(Theme.font(size: 28, weight: .bold))
                     }
                 }
@@ -36,8 +36,7 @@ struct AreaPage: View {
                         Button(isRunning ? "Pausar" : "Começar", systemImage: isRunning ? "pause.fill" : "play.fill") {
                             model.toggle(area.id)
                         }
-                        .buttonStyle(AppActionButtonStyle(primary: true))
-                        .tint(Color(hex: area.colorHex))
+                        .buttonStyle(.heading(primary: true))
                         if let goal {
                             Button { model.route = .goal(goal.id) } label: {
                                 Label(goal.title, systemImage: "flag")
@@ -47,7 +46,7 @@ struct AreaPage: View {
                             Text("Atividade solta").foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
-                        Button("Editar") { editing = true }
+                        Button("Editar") { editing = true }.buttonStyle(.heading())
                     }
 
                     PageSection(title: "Resumo") {
@@ -74,8 +73,7 @@ struct AreaPage: View {
                 .padding(.horizontal, 40)
             }
             .padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .pageColumn()
         }
         .sheet(isPresented: $editing) { ActivityEditor(activity: area) }
         .sheet(item: $editingSession) { SessionEditor(session: $0) }

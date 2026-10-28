@@ -126,10 +126,9 @@ struct PageHeader<Title: View>: View {
                     .overlay(alignment: .bottomTrailing) {
                         if hovering {
                             HStack {
-                                Button("Trocar capa") { pickCover() }
-                                Button("Remover") { setCover(nil) }
+                                Button("Trocar capa") { pickCover() }.buttonStyle(.heading())
+                                Button("Remover") { setCover(nil) }.buttonStyle(.heading())
                             }
-                            .controlSize(.small)
                             .padding(10)
                         }
                     }
@@ -220,10 +219,13 @@ struct PageSection<Content: View, Accessory: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title).font(Theme.font(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                Spacer()
-                accessory
+            // An empty title drops the header row, for cards that need no name.
+            if !title.isEmpty {
+                HStack {
+                    Text(title).font(Theme.font(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
+                    Spacer()
+                    accessory
+                }
             }
             content
         }
@@ -233,35 +235,51 @@ struct PageSection<Content: View, Accessory: View>: View {
     }
 }
 
-struct ScreenHeading: View {
+/// A screen's title, with its actions (navigation, the main button) on the right.
+struct ScreenHeading<Accessory: View>: View {
     let section: String
     let title: String
     var subtitle: String? = nil
+    @ViewBuilder var accessory: Accessory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(section.uppercased())
-                .font(Theme.font(size: 10, weight: .semibold))
-                .foregroundStyle(Color(hex: "72817d"))
-            Text(title)
-                .font(Theme.font(size: 28, weight: .bold))
-                .foregroundStyle(Theme.text)
-            if let subtitle {
-                Text(subtitle).font(Theme.font(size: 14)).foregroundStyle(Theme.secondaryText)
+        HStack(alignment: .bottom, spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                // The small label only helps when the title says something else, like "Tarefas / Hoje".
+                if section.localizedCaseInsensitiveCompare(title) != .orderedSame {
+                    Text(section.uppercased())
+                        .font(Theme.font(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                Text(title)
+                    .font(Theme.font(size: 28, weight: .bold))
+                    .foregroundStyle(Theme.text)
+                if let subtitle {
+                    Text(subtitle).font(Theme.font(size: 14)).foregroundStyle(Theme.secondaryText)
+                }
             }
+            Spacer(minLength: 0)
+            HStack(spacing: 8) { accessory }
         }
+    }
+}
+
+extension ScreenHeading where Accessory == EmptyView {
+    init(section: String, title: String, subtitle: String? = nil) {
+        self.init(section: section, title: title, subtitle: subtitle, accessory: { EmptyView() })
     }
 }
 
 struct AppActionButtonStyle: ButtonStyle {
     var primary = false
-    var width: CGFloat = 260
+    /// Fixed width for the big buttons; nil hugs the label, for actions in a heading.
+    var width: CGFloat? = 260
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.font(size: 13, weight: .medium))
             .foregroundStyle(primary ? Theme.onAccent : Theme.text)
-            .frame(width: width, height: 44)
+            .frame(width: width, height: width == nil ? 30 : 44)
             .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -270,6 +288,87 @@ struct AppActionButtonStyle: ButtonStyle {
             )
             .contentShape(RoundedRectangle(cornerRadius: 8))
     }
+}
+
+extension ButtonStyle where Self == AppActionButtonStyle {
+    /// A compact button for a screen's heading or a card's header.
+    static func heading(primary: Bool = false) -> AppActionButtonStyle {
+        AppActionButtonStyle(primary: primary, width: nil)
+    }
+}
+
+/// "‹ Hoje ›": steps a day or month back and forth, and jumps back to the current one.
+struct PeriodStepper: View {
+    let currentTitle: String
+    let isCurrent: Bool
+    let step: (Int) -> Void
+    let reset: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            arrow("Anterior", "chevron.left") { step(-1) }
+            Button(action: reset) {
+                Text(currentTitle).padding(.horizontal, 6).frame(height: 30).contentShape(Rectangle())
+            }
+            .disabled(isCurrent)
+            arrow("Próximo", "chevron.right") { step(1) }
+        }
+        .buttonStyle(.plain)
+        .font(Theme.font(size: 13, weight: .medium))
+        .contentShape(Rectangle())
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
+    }
+
+    /// The whole 30×30 square is clickable, not just the chevron.
+    private func arrow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).frame(width: 30, height: 30).contentShape(Rectangle())
+        }
+        .accessibilityLabel(title)
+        .help(title)
+    }
+}
+
+/// A choice between a few views, in the app's own look: same height, colors and corners as the heading buttons.
+struct SegmentedTabs<Value: Hashable>: View {
+    let options: [(value: Value, title: String)]
+    @Binding var selection: Value
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                let selected = option.value == selection
+                Button { selection = option.value } label: {
+                    Text(option.title)
+                        .font(Theme.font(size: 13, weight: .medium))
+                        .foregroundStyle(selected ? Theme.text : Theme.secondaryText)
+                        .padding(.horizontal, 12)
+                        .frame(height: 26)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Theme.border : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+extension View {
+    /// The column every page sits in: at most 888 points wide, centered in the window.
+    func pageColumn() -> some View {
+        frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .top)
+    }
+}
+
+extension String {
+    /// "Quarta-feira, 28 de outubro": only the first letter goes up, unlike `capitalized`.
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 extension PageSection where Accessory == EmptyView {

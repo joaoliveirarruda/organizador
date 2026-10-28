@@ -27,25 +27,23 @@ struct TasksScreen: View {
         let visible = tasks(for: filter)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeading(section: "Tarefas", title: filter.title)
-                PageSection(title: "Listas") {
-                    ForEach(TaskFilter.allCases) { list in
-                        Button { filter = list } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(list.title).foregroundStyle(Theme.text)
-                                    Text("›").foregroundStyle(Theme.secondaryText)
-                                }
-                                Text(listSubtitle(list)).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
+                ScreenHeading(section: "Tarefas", title: filter.title, subtitle: listSubtitle(filter)) {
+                    SegmentedTabs(options: TaskFilter.allCases.map { ($0, $0.title) }, selection: $filter)
+                    Button("Nova tarefa") { creatingTask = true }
+                        .buttonStyle(.heading(primary: true))
+                        .keyboardShortcut("n")
                 }
-                PageSection(title: "Tarefas") {
+                PageSection(title: "") {
+                    if filter != .completed {
+                        HStack(spacing: 10) {
+                            Image(systemName: "plus").foregroundStyle(Theme.secondaryText).frame(width: 22)
+                            TextField("Adicionar tarefa (Enter)", text: $newTitle)
+                                .textFieldStyle(.plain)
+                                .onSubmit(addTask)
+                        }
+                        .padding(.vertical, 6)
+                        if !visible.isEmpty { Divider() }
+                    }
                     if visible.isEmpty {
                         Text(emptyTitle + " · " + emptyDescription).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                     } else {
@@ -61,28 +59,9 @@ struct TasksScreen: View {
                         }
                     }
                 }
-                if filter != .completed {
-                    PageSection(title: "Adicionar rapidamente") {
-                        TextField("Digite e pressione Enter", text: $newTitle)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit(addTask)
-                    }
-                }
-                HStack(spacing: 8) {
-                    Button("Nova tarefa com detalhes") { creatingTask = true }
-                        .buttonStyle(AppActionButtonStyle(primary: true))
-                    Menu("Menu da tarefa") {
-                        ForEach(visible) { task in
-                            Button(task.title) { editingTask = task }
-                        }
-                    }
-                    .buttonStyle(AppActionButtonStyle())
-                    .disabled(visible.isEmpty)
-                }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
         .sheet(item: $editingTask) { task in
             TaskEditor(task: task)
@@ -128,7 +107,7 @@ struct TasksScreen: View {
     private func addTask() {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        model.addTask(title: title, dueToday: filter == .today)
+        model.addTask(title: title, due: filter == .today ? Date() : nil)
         newTitle = ""
     }
 }
@@ -173,9 +152,11 @@ struct TaskRow: View {
                     .help("Prioridade alta")
             }
             if let due = task.dueDate {
-                Text(due.formatted(.dateTime.day().month(.abbreviated)))
+                let overdue = model.isOverdue(task)
+                // Said in words too, not by the red alone.
+                Text((overdue ? "atrasada · " : "") + due.formatted(.dateTime.day().month(.abbreviated)))
                     .font(.callout)
-                    .foregroundStyle(model.isOverdue(task) ? Color.red : Color.secondary)
+                    .foregroundStyle(overdue ? Color.red : Color.secondary)
             }
         }
         .padding(.vertical, 2)

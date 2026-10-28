@@ -28,8 +28,7 @@ struct PreferencesView: View {
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -166,7 +165,7 @@ struct PreferencesView: View {
             Button { selectedSection = title } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack { Text(title).foregroundStyle(Theme.text); Spacer(); Text("›").foregroundStyle(Theme.secondaryText) }
-                    Text(description).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+                    Text(description).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 7)

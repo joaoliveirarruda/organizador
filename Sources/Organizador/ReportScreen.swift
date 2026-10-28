@@ -14,17 +14,12 @@ struct ReportScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .bottom) {
                     ScreenHeading(
-                        section: "Relatório",
-                        title: "Seu tempo",
+                        section: "Tempo",
+                        title: "Relatório",
                         subtitle: report.interval.map { "\(label($0)) · \(DurationFormat.compact(total))" } ?? "Nenhum tempo registrado ainda"
                     )
                     Spacer()
-                    Picker("Período", selection: $period) {
-                        ForEach(ReportPeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    SegmentedTabs(options: ReportPeriod.allCases.map { ($0, $0.rawValue) }, selection: $period)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -52,9 +47,9 @@ struct ReportScreen: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
-            .frame(maxWidth: 888, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .pageColumn()
         }
+        .toolbar { ToolbarItem(placement: .principal) { TimeTabs() } }
     }
 
     private static let months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
