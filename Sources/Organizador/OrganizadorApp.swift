@@ -1,6 +1,7 @@
 import AppKit
 import OrganizadorCore
 import SwiftUI
+import UserNotifications
 
 @main
 struct OrganizadorApp: App {
@@ -29,10 +30,22 @@ struct OrganizadorApp: App {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Without an app bundle (`swift run`), macOS would start the app in the background.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        StaleNotifier.setDelegate(self)
+        StaleNotifier.requestPermission()
+    }
+
+    /// Clicking the stalled-goals notification opens Home.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
+    ) async {
+        await MainActor.run {
+            NSApp.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: StaleNotifier.openHome, object: nil)
+        }
     }
 }

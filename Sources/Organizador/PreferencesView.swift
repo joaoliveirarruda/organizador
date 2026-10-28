@@ -53,6 +53,26 @@ struct PreferencesView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Sessões no Calendário do macOS") {
+                Toggle("Criar um evento para cada sessão cronometrada", isOn: Binding(
+                    get: { preferences.exportSessionsToCalendar },
+                    set: { model.setExportSessions($0) }
+                ))
+                if preferences.exportSessionsToCalendar {
+                    CalendarExportStatus()
+                }
+                Text("O evento leva a área, o objetivo e o horário de início e fim. Com sua conta Google adicionada em Ajustes do Sistema › Contas de Internet, ele aparece também no Google Agenda. Sessões antigas não são exportadas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Fio da meada") {
+                Toggle("Avisar uma vez por dia sobre objetivos parados", isOn: Binding(
+                    get: { preferences.staleGoalNotifications },
+                    set: { model.setStaleGoalNotifications($0) }
+                ))
+            }
+
             Section("Notas") {
                 LabeledContent("Pasta") {
                     HStack {
@@ -98,6 +118,38 @@ struct PreferencesView: View {
         panel.prompt = "Usar esta pasta"
         if panel.runModal() == .OK, let url = panel.url {
             model.setNotesFolder(url)
+        }
+    }
+}
+
+/// Calendar access and which calendar receives the sessions.
+private struct CalendarExportStatus: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let exporter = model.calendarExport
+        switch exporter.access {
+        case .granted:
+            Picker("Calendário", selection: Binding(
+                get: { model.data.preferences.exportCalendarID },
+                set: { model.setExportCalendar($0) }
+            )) {
+                Text("Padrão do Mac").tag("")
+                ForEach(exporter.calendars, id: \.calendarIdentifier) { calendar in
+                    Text("\(calendar.title) · \(calendar.source.title)").tag(calendar.calendarIdentifier)
+                }
+            }
+        case .denied:
+            VStack(alignment: .leading, spacing: 6) {
+                Label("O Organizador não tem acesso ao Calendário, então os eventos não são criados.", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                Text("Libere em Ajustes do Sistema › Privacidade e Segurança › Calendários.").font(.caption)
+                Button("Abrir Ajustes do Sistema") { CalendarExporter.openPrivacySettings() }
+            }
+        case .unavailable:
+            Text("Disponível só no app empacotado (scripts/build-app.sh).").foregroundStyle(.secondary)
+        case .unknown:
+            ProgressView().controlSize(.small)
         }
     }
 }

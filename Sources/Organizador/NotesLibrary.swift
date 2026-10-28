@@ -69,9 +69,9 @@ final class NotesLibrary {
 
     /// Creates a note and selects it.
     @discardableResult
-    func create(title: String = "Sem título") -> Note? {
+    func create(title: String = "Sem título", body: String = "") -> Note? {
         do {
-            let note = try store.create(title: title)
+            let note = try store.create(title: title, body: body)
             notes.insert(note, at: 0)
             selectedURL = note.url
             return note

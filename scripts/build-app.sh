@@ -31,6 +31,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>CFBundleDevelopmentRegion</key><string>pt-BR</string>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>O Organizador cria um evento para cada sessão cronometrada, para o seu calendário mostrar de que horas a que horas você trabalhou em cada coisa.</string>
+    <key>NSCalendarsUsageDescription</key><string>O Organizador cria um evento para cada sessão cronometrada no seu calendário.</string>
+    <key>NSUserNotificationsUsageDescription</key><string>O Organizador avisa no máximo uma vez por dia quando algum objetivo está parado.</string>
 </dict>
 </plist>
 PLIST

@@ -203,7 +203,7 @@ struct HabitEditor: View {
                 }
                 Toggle("Marcar sozinho pelo cronômetro", isOn: $isAutomatic)
                 if isAutomatic {
-                    Picker("Atividade", selection: $autoActivityID) {
+                    Picker("Área", selection: $autoActivityID) {
                         Text("Escolha…").tag(UUID?.none)
                         ForEach(model.activeActivities) { activity in
                             Text(activity.name).tag(Optional(activity.id))
