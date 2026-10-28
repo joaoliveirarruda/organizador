@@ -2,7 +2,8 @@ import AppKit
 import OrganizadorCore
 import SwiftUI
 
-/// A note opened as a page: icon and cover (kept in the file's front matter), title, editor and backlinks.
+/// A note opened as a page: icon and cover (kept in the file's front matter), the page it was created under,
+/// title, editor and backlinks.
 struct NotePage: View {
     @Environment(AppModel.self) private var model
     let note: Note
@@ -19,14 +20,25 @@ struct NotePage: View {
                 setIcon: { icon in change { $0.icon = icon } },
                 setCover: { cover in change { $0.cover = cover } }
             ) {
-                TitleField(note: note)
+                VStack(alignment: .leading, spacing: 4) {
+                    if let parent = meta.parent {
+                        Button(parent, systemImage: "arrow.turn.left.up") { model.open(link: parent) }
+                            .buttonStyle(.link)
+                            .font(.callout)
+                    }
+                    TitleField(note: note)
+                }
             }
             MarkdownEditor(
                 id: note.url,
                 text: body,
                 // The editor only sees the body; the front matter is put back on every change.
                 onChange: { library.setBody(FrontMatter.parse(current.body).0.render($0), of: note.url) },
-                onOpenLink: { model.open(link: $0) }
+                onOpenLink: { model.open(link: $0) },
+                pages: library.notes.map(\.title).filter { $0 != note.title },
+                goals: model.data.goals.map(\.title),
+                tasks: model.data.tasks.filter { !$0.isDone }.map(\.title),
+                onNewSubpage: newSubpage
             )
             Backlinks(note: note, notes: library.notes) { model.route = .note($0.url) }
         }
@@ -53,6 +65,13 @@ struct NotePage: View {
     /// The note as it is now in the library (the view's copy may be a keystroke behind).
     private var current: Note {
         library.notes.first { $0.url == note.url } ?? note
+    }
+
+    /// Creates a note that points back here and opens it once the link to it is in this page.
+    private func newSubpage() -> String? {
+        guard let child = library.create(body: FrontMatter(parent: note.title).render("")) else { return nil }
+        DispatchQueue.main.async { model.route = .note(child.url) }
+        return child.title
     }
 
     private func change(_ edit: (inout FrontMatter) -> Void) {

@@ -642,6 +642,33 @@ final class NotesTests: XCTestCase {
         XCTAssertEqual(hidden.map { (text as NSString).substring(with: $0.range) }, ["[[Nota|", "]]"])
     }
 
+    func testCalloutTableAndHighlight() {
+        let text = "> [!nota] Dica\n> segue\n> citação? não, callout\n\n| A | B |\n|---|:-:|\n| 1 | 2 |\nfim ==marcado==\n| solto |\n"
+        XCTAssertEqual(kinds(text), [.callout, .callout, .callout, .table, .highlight])
+        let table = MarkdownSpans.parse(text).first { $0.kind == .table }!
+        XCTAssertEqual((text as NSString).substring(with: table.range), "| A | B |\n|---|:-:|\n| 1 | 2 |")
+    }
+
+    func testTableRoundTrip() {
+        let rows = MarkdownTable.parse("|Nome|Nota|\n|---|---|\n| Ana | 10 |\n| a\\|b |\n")
+        XCTAssertEqual(rows, [["Nome", "Nota"], ["Ana", "10"], ["a|b", ""]])
+        let text = MarkdownTable.render(rows)
+        XCTAssertEqual(text, "| Nome | Nota |\n| ---- | ---- |\n| Ana  | 10   |\n| a\\|b |      |")
+        XCTAssertEqual(MarkdownTable.parse(text), rows)
+    }
+
+    func testSubpageLinksToParentThroughFrontMatter() throws {
+        let store = NoteStore(folder: folder)
+        let parent = try store.create(title: "Projeto")
+        let child = try store.create(title: "Tarefas", body: FrontMatter(parent: "Projeto").render(""))
+        XCTAssertEqual(child.body, "---\npai: \"[[Projeto]]\"\n---\n")
+        XCTAssertEqual(FrontMatter.parse(child.body).0.parent, "Projeto")
+        let graph = NoteGraph.build(notes: [parent, child], goals: [], tasks: [])
+        XCTAssertEqual(graph.edges, [GraphEdge(from: 0, to: 1)])
+        _ = try store.rename(parent, to: "Projeto X")
+        XCTAssertEqual(try store.list().first { $0.title == "Tarefas" }.map { FrontMatter.parse($0.body).0.parent }, "Projeto X")
+    }
+
     func testGraphLinksNotesGoalsAndTasks() throws {
         let store = NoteStore(folder: folder)
         var a = try store.create(title: "A")
