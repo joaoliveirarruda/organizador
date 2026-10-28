@@ -11,17 +11,20 @@ struct SearchScreen: View {
         let text = query.trimmingCharacters(in: .whitespaces)
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                ScreenHeading(section: "Busca", title: "Buscar em todo o espaço", subtitle: "Encontre notas, objetivos, áreas e tarefas.")
                 TextField("Buscar notas, objetivos, áreas e tarefas", text: $query)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 22))
+                    .font(Theme.font(size: 16))
                     .focused($focused)
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.card))
                 if !text.isEmpty {
                     results(text)
                 }
             }
-            .padding(48)
-            .frame(maxWidth: 820, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .onAppear { focused = true }
     }

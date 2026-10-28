@@ -160,7 +160,7 @@ struct NoteGraphView: View {
             }
             if zoom > 0.7 || neighbors.contains(index) {
                 let label = Text(node.title)
-                    .font(.system(size: 11, weight: index == focus ? .semibold : .regular))
+                    .font(Theme.font(size: 11, weight: index == focus ? .semibold : .regular))
                     .foregroundStyle(Color.primary.opacity(dimmed(index) ? 0.25 : 0.85))
                 context.draw(label, at: CGPoint(x: center.x, y: center.y + r + 4), anchor: .top)
             }

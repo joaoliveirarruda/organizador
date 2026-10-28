@@ -20,52 +20,84 @@ struct TasksScreen: View {
     @State private var filter: TaskFilter = .today
     @State private var newTitle = ""
     @State private var editingTask: TaskItem?
+    @State private var creatingTask = false
+    @State private var deletingTask: TaskItem?
 
     var body: some View {
         let visible = tasks(for: filter)
-        VStack(alignment: .leading, spacing: 12) {
-            Picker("Lista", selection: $filter) {
-                ForEach(TaskFilter.allCases) { filter in
-                    Text(filter.title).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 320)
-
-            if filter != .completed {
-                TextField(
-                    filter == .today ? "Nova tarefa para hoje (Enter para adicionar)" : "Nova tarefa (Enter para adicionar)",
-                    text: $newTitle
-                )
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(addTask)
-            }
-
-            if visible.isEmpty {
-                ContentUnavailableView(
-                    emptyTitle,
-                    systemImage: "checklist",
-                    description: Text(emptyDescription)
-                )
-            } else {
-                List {
-                    ForEach(visible) { task in
-                        TaskRow(task: task)
-                            .contentShape(Rectangle())
-                            .onTapGesture { editingTask = task }
-                            .contextMenu {
-                                Button("Editar") { editingTask = task }
-                                Button("Excluir", role: .destructive) { model.deleteTask(task.id) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ScreenHeading(section: "Tarefas", title: filter.title)
+                PageSection(title: "Listas") {
+                    ForEach(TaskFilter.allCases) { list in
+                        Button { filter = list } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(list.title).foregroundStyle(Theme.text)
+                                    Text("›").foregroundStyle(Theme.secondaryText)
+                                }
+                                Text(listSubtitle(list)).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
+                PageSection(title: "Tarefas") {
+                    if visible.isEmpty {
+                        Text(emptyTitle + " · " + emptyDescription).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                    } else {
+                        ForEach(visible) { task in
+                            TaskRow(task: task)
+                                .contentShape(Rectangle())
+                                .onTapGesture { editingTask = task }
+                                .contextMenu {
+                                    Button("Editar") { editingTask = task }
+                                    Button("Excluir", role: .destructive) { deletingTask = task }
+                                }
+                                .padding(.vertical, 6)
+                        }
+                    }
+                }
+                if filter != .completed {
+                    PageSection(title: "Adicionar rapidamente") {
+                        TextField("Digite e pressione Enter", text: $newTitle)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(addTask)
+                    }
+                }
+                HStack(spacing: 8) {
+                    Button("Nova tarefa com detalhes") { creatingTask = true }
+                        .buttonStyle(AppActionButtonStyle(primary: true))
+                    Menu("Menu da tarefa") {
+                        ForEach(visible) { task in
+                            Button(task.title) { editingTask = task }
+                        }
+                    }
+                    .buttonStyle(AppActionButtonStyle())
+                    .disabled(visible.isEmpty)
+                }
             }
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(24)
-        .navigationTitle("Tarefas")
         .sheet(item: $editingTask) { task in
             TaskEditor(task: task)
+        }
+        .sheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
+        .confirmationDialog("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
+            Button("Excluir tarefa", role: .destructive) { model.deleteTask(task.id); deletingTask = nil }
+        } message: { _ in Text("A tarefa será removida.") }
+    }
+
+    private func listSubtitle(_ list: TaskFilter) -> String {
+        switch list {
+        case .today: "Inclui atrasadas"
+        case .upcoming: "Futuras e sem prazo"
+        case .completed: "Mais recentes primeiro"
         }
     }
 
@@ -153,27 +185,28 @@ struct TaskRow: View {
 struct TaskEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    let task: TaskItem
+    let task: TaskItem?
     @State private var title: String
     @State private var notes: String
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var priority: TaskPriority
     @State private var goalID: UUID?
+    @State private var confirmingDelete = false
 
-    init(task: TaskItem) {
+    init(task: TaskItem?) {
         self.task = task
-        _title = State(initialValue: task.title)
-        _notes = State(initialValue: task.notes)
-        _hasDueDate = State(initialValue: task.dueDate != nil)
-        _dueDate = State(initialValue: task.dueDate ?? Date())
-        _priority = State(initialValue: task.priority)
-        _goalID = State(initialValue: task.goalID)
+        _title = State(initialValue: task?.title ?? "")
+        _notes = State(initialValue: task?.notes ?? "")
+        _hasDueDate = State(initialValue: task?.dueDate != nil)
+        _dueDate = State(initialValue: task?.dueDate ?? Date())
+        _priority = State(initialValue: task?.priority ?? .normal)
+        _goalID = State(initialValue: task?.goalID)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Editar tarefa").font(.headline)
+            Text(task == nil ? "Nova tarefa" : "Editar tarefa").font(.headline)
             Form {
                 TextField("Título", text: $title)
                 TextField("Notas", text: $notes, axis: .vertical)
@@ -195,9 +228,10 @@ struct TaskEditor: View {
                 }
             }
             HStack {
-                Button("Excluir", role: .destructive) {
-                    model.deleteTask(task.id)
-                    dismiss()
+                if task != nil {
+                    Button("Excluir", role: .destructive) {
+                        confirmingDelete = true
+                    }
                 }
                 Spacer()
                 Button("Cancelar", role: .cancel) { dismiss() }
@@ -209,12 +243,20 @@ struct TaskEditor: View {
         }
         .padding(20)
         .frame(width: 440)
+        .confirmationDialog("Excluir tarefa?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            if let task {
+                Button("Excluir tarefa", role: .destructive) {
+                    model.deleteTask(task.id)
+                    dismiss()
+                }
+            }
+        }
     }
 
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     private func save() {
-        var updated = task
+        var updated = task ?? TaskItem(title: trimmedTitle)
         updated.title = trimmedTitle
         updated.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.dueDate = hasDueDate ? model.calendar.startOfDay(for: dueDate) : nil

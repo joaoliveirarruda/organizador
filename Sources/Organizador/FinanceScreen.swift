@@ -6,6 +6,7 @@ struct FinanceScreen: View {
     @Environment(AppModel.self) private var model
     @State private var monthStart = Date()
     @State private var editingTransaction: MoneyTransaction?
+    @State private var deletingTransaction: MoneyTransaction?
     @State private var addingTransaction = false
     @State private var editingCategories = false
     @State private var choosingFile = false
@@ -17,34 +18,18 @@ struct FinanceScreen: View {
         let transactions = model.transactions(in: month)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
-                    Text(month.start.formatted(.dateTime.month(.wide).year()).capitalized)
-                        .font(.title2.weight(.semibold))
-                        .frame(minWidth: 200)
-                    Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
-                    Spacer()
-                }
-                .buttonStyle(.borderless)
-
-                HStack(spacing: 12) {
-                    SummaryCard(title: "Receitas", cents: summary.incomeCents, color: .green)
-                    SummaryCard(title: "Despesas", cents: summary.expenseCents, color: .red)
-                    SummaryCard(
-                        title: "Saldo",
-                        cents: summary.balanceCents,
-                        color: summary.balanceCents >= 0 ? .primary : .red
-                    )
-                }
-
+            VStack(alignment: .leading, spacing: 14) {
+                ScreenHeading(
+                    section: "Finanças",
+                    title: "Finanças",
+                    subtitle: "\(month.start.formatted(.dateTime.month(.wide).year()).capitalized) · receitas \(Finance.format(cents: summary.incomeCents)) · despesas \(Finance.format(cents: summary.expenseCents)) · saldo \(Finance.format(cents: summary.balanceCents))"
+                )
                 BudgetSection(summary: summary)
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Lançamentos").font(.headline)
+                PageSection(title: "Lançamentos") {
                     if transactions.isEmpty {
                         Text("Nenhum lançamento neste mês. Adicione um ou importe o extrato do banco.")
-                            .foregroundStyle(.secondary)
+                            .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                     }
                     ForEach(transactions) { transaction in
                         TransactionRow(transaction: transaction)
@@ -52,34 +37,22 @@ struct FinanceScreen: View {
                             .onTapGesture { editingTransaction = transaction }
                             .contextMenu {
                                 Button("Editar") { editingTransaction = transaction }
-                                Button("Excluir", role: .destructive) { model.deleteTransaction(transaction.id) }
+                                Button("Excluir", role: .destructive) { deletingTransaction = transaction }
                             }
-                        Divider()
+                            .padding(.vertical, 5)
                     }
                 }
-            }
-            .padding(24)
-            .frame(maxWidth: 820, alignment: .leading)
-        }
-        .navigationTitle("Finanças")
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    editingCategories = true
-                } label: {
-                    Label("Categorias e orçamento", systemImage: "tag")
-                }
-                Button {
-                    choosingFile = true
-                } label: {
-                    Label("Importar extrato", systemImage: "square.and.arrow.down")
-                }
-                Button {
-                    addingTransaction = true
-                } label: {
-                    Label("Novo lançamento", systemImage: "plus")
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                    Button("Mês anterior") { shiftMonth(-1) }.buttonStyle(AppActionButtonStyle())
+                    Button("Próximo mês") { shiftMonth(1) }.buttonStyle(AppActionButtonStyle())
+                    Button("Novo lançamento") { addingTransaction = true }.buttonStyle(AppActionButtonStyle(primary: true))
+                    Button("Importar extrato") { choosingFile = true }.buttonStyle(AppActionButtonStyle())
+                    Button("Categorias e orçamento") { editingCategories = true }.buttonStyle(AppActionButtonStyle())
                 }
             }
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .sheet(isPresented: $addingTransaction) {
             TransactionEditor(transaction: nil, defaultDate: defaultDate(in: month))
@@ -98,6 +71,19 @@ struct FinanceScreen: View {
             allowedContentTypes: [UTType(filenameExtension: "ofx") ?? .data, .commaSeparatedText, .plainText, .data]
         ) { result in
             if case .success(let url) = result { load(url) }
+        }
+        .confirmationDialog(
+            "Excluir lançamento?",
+            isPresented: Binding(get: { deletingTransaction != nil }, set: { if !$0 { deletingTransaction = nil } }),
+            titleVisibility: .visible,
+            presenting: deletingTransaction
+        ) { transaction in
+            Button("Excluir lançamento", role: .destructive) {
+                model.deleteTransaction(transaction.id)
+                deletingTransaction = nil
+            }
+        } message: { _ in
+            Text("O lançamento será removido.")
         }
     }
 
@@ -127,25 +113,6 @@ struct FinanceScreen: View {
     }
 }
 
-private struct SummaryCard: View {
-    let title: String
-    let cents: Int
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.callout).foregroundStyle(.secondary)
-            Text(Finance.format(cents: cents))
-                .font(.title3.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(color)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.06)))
-    }
-}
-
 /// Spending per expense category against its monthly budget.
 private struct BudgetSection: View {
     @Environment(AppModel.self) private var model
@@ -159,9 +126,10 @@ private struct BudgetSection: View {
             .sorted { $0.spent > $1.spent }
         let uncategorized = summary.expenseByCategory[nil] ?? 0
 
-        if !rows.isEmpty || uncategorized > 0 {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Gastos por categoria").font(.headline)
+        PageSection(title: "Orçamento") {
+            if rows.isEmpty && uncategorized == 0 {
+                Text("Nenhuma categoria ou orçamento neste mês.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+            } else {
                 ForEach(rows, id: \.category.id) { row in
                     BudgetRow(
                         name: row.category.name,

@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import OrganizadorCore
 import SwiftUI
 import UserNotifications
@@ -7,6 +8,12 @@ import UserNotifications
 struct OrganizadorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
+
+    init() {
+        if let fontURL = Bundle.module.url(forResource: "Inter", withExtension: "ttf") {
+            CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+        }
+    }
 
     var body: some Scene {
         WindowGroup("Organizador", id: "main") {

@@ -12,7 +12,7 @@ let package = Package(
         // Pure Foundation logic (models, timer, stats, storage). No UI, testable anywhere.
         .target(name: "OrganizadorCore"),
         // The macOS app (SwiftUI).
-        .executableTarget(name: "Organizador", dependencies: ["OrganizadorCore"]),
+        .executableTarget(name: "Organizador", dependencies: ["OrganizadorCore"], resources: [.process("Resources")]),
         .testTarget(name: "OrganizadorCoreTests", dependencies: ["OrganizadorCore"]),
     ]
 )

@@ -7,47 +7,77 @@ struct TimerScreen: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewActivity = false
     @State private var editingActivity: Activity?
+    @State private var addingSession = false
+    @State private var choosingActivity = false
+    @State private var archivingActivity: Activity?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    TimerHeader()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                TimerHeader()
 
-                    if let notice = model.pauseNotice {
-                        HStack {
-                            Image(systemName: "pause.circle")
-                            Text(notice)
-                            Spacer()
-                            Button("OK") { model.pauseNotice = nil }
-                        }
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
+                if let notice = model.pauseNotice {
+                    HStack {
+                        Image(systemName: "pause.circle")
+                        Text(notice)
+                        Spacer()
+                        Button("OK") { model.pauseNotice = nil }
                     }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
+                }
 
-                    PageSection(title: "Áreas") {
-                        if model.activeActivities.isEmpty {
-                            Text("Crie uma área para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
-                        }
-                        ForEach(model.activeActivities) { area in
-                            AreaTimerRow(area: area)
-                                .contextMenu {
-                                    Button("Abrir") { model.route = .area(area.id) }
-                                    Button("Editar") { editingActivity = area }
-                                    Button("Arquivar", role: .destructive) { model.archiveActivity(area.id) }
-                                }
-                        }
-                    } accessory: {
-                        Button("Nova área", systemImage: "plus") { showingNewActivity = true }
-                            .buttonStyle(.borderless)
+                PageSection(title: "Áreas") {
+                    if model.activeActivities.isEmpty {
+                        Text("Crie uma área para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
+                    }
+                    ForEach(model.activeActivities) { area in
+                        AreaTimerRow(area: area)
+                            .contextMenu {
+                                Button("Abrir") { model.route = .area(area.id) }
+                                Button("Editar") { editingActivity = area }
+                                Button("Arquivar", role: .destructive) { archivingActivity = area }
+                            }
                     }
                 }
-                .padding(40)
-                .frame(maxWidth: 640, alignment: .leading)
+
+                PageSection(title: "Sessões de hoje") {
+                    let sessions = model.data.sessions.filter { model.calendar.isDate($0.start, inSameDayAs: model.now) }.sorted { $0.start < $1.start }
+                    if sessions.isEmpty {
+                        Text("Nenhuma sessão registrada hoje.").font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                    }
+                    ForEach(sessions) { session in
+                        HStack {
+                            Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
+                                .monospacedDigit().foregroundStyle(Theme.secondaryText)
+                            Text(model.activity(session.activityID)?.name ?? "Área removida")
+                            Spacer()
+                            Text(DurationFormat.short(session.duration)).foregroundStyle(Theme.secondaryText)
+                        }
+                        .font(Theme.font(size: 12))
+                        .padding(.vertical, 5)
+                    }
+                }
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                    Button(model.runningActivity.map { "Pausar \($0.name)" } ?? "Iniciar \(model.activeActivities.first?.name ?? "área")") {
+                        if let running = model.runningActivity { model.toggle(running.id) }
+                        else if let first = model.activeActivities.first { model.start(first.id) }
+                    }
+                    .buttonStyle(AppActionButtonStyle(primary: true))
+                    .disabled(model.runningActivity == nil && model.activeActivities.isEmpty)
+                    Button("Trocar de área") { choosingActivity = true }
+                        .buttonStyle(AppActionButtonStyle())
+                    Button("Nova área") { showingNewActivity = true }.buttonStyle(AppActionButtonStyle())
+                    Button("Adicionar sessão") { addingSession = true }
+                        .buttonStyle(AppActionButtonStyle())
+                        .disabled(model.activeActivities.isEmpty)
+                    Button("Agenda do dia") { model.route = .agenda }.buttonStyle(AppActionButtonStyle())
+                }
             }
-            Divider()
-            DayCalendar(day: model.now)
-                .frame(width: 300)
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .sheet(isPresented: $showingNewActivity) {
             ActivityEditor(activity: nil)
@@ -55,6 +85,61 @@ struct TimerScreen: View {
         .sheet(item: $editingActivity) { activity in
             ActivityEditor(activity: activity)
         }
+        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+        .sheet(isPresented: $choosingActivity) {
+            ActivityChooser(activities: model.activeActivities) { model.start($0.id) }
+        }
+        .confirmationDialog(
+            "Arquivar área?",
+            isPresented: Binding(get: { archivingActivity != nil }, set: { if !$0 { archivingActivity = nil } }),
+            titleVisibility: .visible,
+            presenting: archivingActivity
+        ) { area in
+            Button("Arquivar \(area.name)", role: .destructive) {
+                model.archiveActivity(area.id)
+                archivingActivity = nil
+            }
+        } message: { area in
+            Text("As sessões registradas serão mantidas.")
+        }
+    }
+}
+
+private struct ActivityChooser: View {
+    @Environment(\.dismiss) private var dismiss
+    let activities: [Activity]
+    let select: (Activity) -> Void
+    @State private var selectedID: UUID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ScreenHeading(section: "Cronômetro", title: "Escolha uma área", subtitle: "Selecione uma área antes de iniciar.")
+            PageSection(title: "Áreas") {
+                ForEach(activities) { activity in
+                    Button { selectedID = activity.id } label: {
+                        HStack {
+                            Text(activity.name).foregroundStyle(Theme.text)
+                            Spacer()
+                            Image(systemName: selectedID == activity.id ? "largecircle.fill.circle" : "circle")
+                                .foregroundStyle(selectedID == activity.id ? Theme.accent : Theme.secondaryText)
+                        }
+                        .padding(.vertical, 5)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            HStack(spacing: 8) {
+                Button("Cancelar") { dismiss() }.buttonStyle(AppActionButtonStyle())
+                Button("Iniciar") {
+                    if let activity = activities.first(where: { $0.id == selectedID }) { select(activity) }
+                    dismiss()
+                }
+                .buttonStyle(AppActionButtonStyle(primary: true))
+                .disabled(selectedID == nil)
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
     }
 }
 
@@ -67,34 +152,11 @@ private struct TimerHeader: View {
         let target = model.dailyTarget
         let running = model.runningActivity
         let goal = running?.goalID.flatMap(model.goal)
-        let color = running.map { Color(hex: $0.colorHex) } ?? Theme.text
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text("Hoje").foregroundStyle(Theme.secondaryText)
-                if let goal, let deadline = goal.deadline {
-                    Text("\(dDay(deadline, now: model.now, calendar: model.calendar)) · \(goal.title)")
-                        .font(.callout.weight(.semibold))
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(Capsule().fill(color.opacity(0.15)))
-                }
-            }
-            Text(DurationFormat.clock(total))
-                .font(.system(size: 64, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(color)
-            if let running {
-                Label("\(running.name) · \(DurationFormat.clock(model.currentElapsed))", systemImage: "record.circle")
-                    .foregroundStyle(color)
-            }
-            if target > 0 {
-                ProgressView(value: min(1, total / target)).tint(color)
-                Text(total >= target
-                    ? "Meta do dia de \(DurationFormat.short(target)) cumprida"
-                    : "\(Int(total / target * 100))% da meta do dia (\(DurationFormat.short(target))) · faltam \(DurationFormat.short(target - total))")
-                    .font(.callout)
-                    .foregroundStyle(Theme.secondaryText)
-            }
-        }
+        ScreenHeading(
+            section: "Cronômetro",
+            title: "Seu tempo",
+            subtitle: "Hoje · \(DurationFormat.short(total))" + (target > 0 ? " de uma meta de \(DurationFormat.short(target))" : "") + (goal.map { " · \($0.title)" } ?? "")
+        )
     }
 }
 
@@ -120,7 +182,7 @@ private struct AreaTimerRow: View {
                     IconView(icon: area.icon, base: model.imagesFolder, fallback: "circle.fill", size: 18)
                         .foregroundStyle(color)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(area.name).font(.system(size: 15, weight: .medium))
+                        Text(area.name).font(Theme.font(size: 15, weight: .medium))
                         if let goal {
                             HStack(spacing: 6) {
                                 Text(goal.title).font(.caption).foregroundStyle(Theme.secondaryText)
@@ -159,7 +221,7 @@ struct DayCalendar: View {
         let sessions = model.data.sessions.filter { $0.end > interval.start && $0.start < interval.end }
         VStack(spacing: 0) {
             HStack {
-                Text("Calendário do dia").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                Text("Calendário do dia").font(Theme.font(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                 Spacer()
                 Button { addingSession = true } label: { Image(systemName: "plus") }
                     .buttonStyle(.borderless)

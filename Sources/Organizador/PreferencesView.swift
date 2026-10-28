@@ -5,10 +5,43 @@ import SwiftUI
 struct PreferencesView: View {
     @Environment(AppModel.self) private var model
     @State private var calendarLink = ""
+    @State private var selectedSection: String?
+
+    init(section: String? = nil) {
+        _selectedSection = State(initialValue: section)
+    }
 
     var body: some View {
         let preferences = model.data.preferences
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let selectedSection {
+                    Button("‹  Ajustes") { self.selectedSection = nil }
+                        .buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                    ScreenHeading(section: "Ajustes", title: selectedSection, subtitle: settingsSubtitle(selectedSection))
+                    settingsForm(preferences)
+                } else {
+                    ScreenHeading(section: "Ajustes", title: "Ajustes", subtitle: "Preferências, arquivos e integrações.")
+                    PageSection(title: "Preferências") {
+                        settingsRows
+                    }
+                }
+            }
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .preferredColorScheme(.dark)
+        .onAppear {
+            calendarLink = model.data.preferences.calendarURL
+            if model.data.preferences.exportSessionsToCalendar { model.calendarExport.connect() }
+        }
+    }
+
+    @ViewBuilder
+    private func settingsForm(_ preferences: Preferences) -> some View {
         Form {
+            if selectedSection == "Cronômetro" {
             Section("Cronômetro") {
                 Stepper(
                     "Meta diária: \(preferences.dailyTargetMinutes == 0 ? "sem meta" : DurationFormat.short(TimeInterval(preferences.dailyTargetMinutes * 60)))",
@@ -30,7 +63,9 @@ struct PreferencesView: View {
                     step: 5
                 )
             }
+            }
 
+            if selectedSection == "Receber compromissos" {
             Section("Agenda") {
                 SecureField("Endereço secreto no formato iCal", text: $calendarLink)
                     .onSubmit { model.setCalendarURL(calendarLink) }
@@ -52,7 +87,9 @@ struct PreferencesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            }
 
+            if selectedSection == "Enviar sessões ao Calendário" {
             Section("Sessões no Calendário do macOS") {
                 Toggle("Criar um evento para cada sessão cronometrada", isOn: Binding(
                     get: { preferences.exportSessionsToCalendar },
@@ -65,14 +102,18 @@ struct PreferencesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            }
 
+            if selectedSection == "Avisos de objetivos parados" {
             Section("Fio da meada") {
                 Toggle("Avisar uma vez por dia sobre objetivos parados", isOn: Binding(
                     get: { preferences.staleGoalNotifications },
                     set: { model.setStaleGoalNotifications($0) }
                 ))
             }
+            }
 
+            if selectedSection == "Notas e dados locais" {
             Section("Notas") {
                 LabeledContent("Pasta") {
                     HStack {
@@ -93,8 +134,9 @@ struct PreferencesView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            }
 
-            if let url = model.dataFileURL {
+            if selectedSection == "Notas e dados locais", let url = model.dataFileURL {
                 Section {
                     LabeledContent("Seus dados") {
                         Button("Mostrar no Finder") {
@@ -105,12 +147,37 @@ struct PreferencesView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
-        .padding()
-        .onAppear {
-            calendarLink = model.data.preferences.calendarURL
-            // Picks up access granted in System Settings meanwhile.
-            if model.data.preferences.exportSessionsToCalendar { model.calendarExport.connect() }
+    }
+
+    private var settingsRows: some View {
+        let rows = [
+            ("Cronômetro", "Meta diária e pausa automática"),
+            ("Receber compromissos", "Agenda por endereço iCal"),
+            ("Enviar sessões ao Calendário", "Permissão e calendário de destino"),
+            ("Avisos de objetivos parados", "No máximo um por dia"),
+            ("Notas e dados locais", "Pasta Markdown e arquivo JSON")
+        ]
+        return ForEach(rows, id: \.0) { title, description in
+            Button { selectedSection = title } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack { Text(title).foregroundStyle(Theme.text); Spacer(); Text("›").foregroundStyle(Theme.secondaryText) }
+                    Text(description).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 7)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func settingsSubtitle(_ section: String) -> String {
+        switch section {
+        case "Cronômetro": "Meta diária e pausa automática."
+        case "Receber compromissos": "Conecte uma agenda por endereço iCal."
+        case "Enviar sessões ao Calendário": "Escolha como registrar sessões no Calendário."
+        case "Avisos de objetivos parados": "Receba no máximo um aviso por dia."
+        default: "Pasta Markdown e arquivo JSON locais."
         }
     }
 

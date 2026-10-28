@@ -15,32 +15,35 @@ struct GoalPage: View {
         let areas = model.activities(forGoal: goal.id).filter { !$0.isArchived }
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 14) {
                 PageHeader(
                     icon: goal.icon, cover: goal.cover, base: model.imagesFolder, fallback: "flag",
                     imagesFolder: model.imagesFolder,
                     setIcon: { icon in update { $0.icon = icon } },
                     setCover: { cover in update { $0.cover = cover } }
                 ) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(goal.title).font(.system(size: 36, weight: .bold))
-                        if let thread { StateBadge(state: thread.state) }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("OBJETIVO").font(Theme.font(size: 10, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(goal.title).font(Theme.font(size: 28, weight: .bold))
+                            if let thread { StateBadge(state: thread.state) }
+                        }
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 14) {
                     actions(areas)
-                    if let thread { numbers(thread) }
+                    if let thread { PageSection(title: "Progresso") { numbers(thread) } }
                     if let thread { leftOff(thread) }
                     notes
                     tasks
                     habits(areas)
                     areaList(areas)
                 }
-                .padding(.horizontal, 48)
+                .padding(.horizontal, 40)
             }
-            .padding(.bottom, 48)
-            .frame(maxWidth: 900, alignment: .leading)
+            .padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .sheet(isPresented: $editing) { GoalEditor(goal: goal) }
@@ -57,11 +60,11 @@ struct GoalPage: View {
         HStack(spacing: 10) {
             let running = model.running.flatMap { running in areas.first { $0.id == running.activityID } }
             if let running {
-                Button("Pausar \(running.name)", systemImage: "pause.fill") { model.toggle(running.id) }
-                    .buttonStyle(.borderedProminent)
+                Button("Pausar \(running.name)") { model.toggle(running.id) }
+                    .buttonStyle(AppActionButtonStyle(primary: true))
             } else if areas.count == 1 {
-                Button("Trabalhar nisso", systemImage: "play.fill") { model.start(areas[0].id) }
-                    .buttonStyle(.borderedProminent)
+                Button("Trabalhar neste objetivo") { model.start(areas[0].id) }
+                    .buttonStyle(AppActionButtonStyle(primary: true))
             } else if areas.isEmpty {
                 Button("Criar área para cronometrar", systemImage: "plus") { addingArea = true }
             } else {
@@ -264,6 +267,7 @@ struct GoalEditor: View {
     @State private var weeklyHours: Double
     @State private var staleDays: Int
     @State private var activityIDs: Set<UUID> = []
+    @State private var confirmingDelete = false
 
     init(goal: Goal?) {
         self.goal = goal
@@ -331,11 +335,9 @@ struct GoalEditor: View {
             .frame(minHeight: 420)
 
             HStack {
-                if let goal {
+                if goal != nil {
                     Button("Excluir objetivo", role: .destructive) {
-                        model.deleteGoal(goal.id)
-                        model.route = .home
-                        dismiss()
+                        confirmingDelete = true
                     }
                 }
                 Spacer()
@@ -348,6 +350,15 @@ struct GoalEditor: View {
         }
         .padding(20)
         .frame(width: 480)
+        .confirmationDialog("Excluir objetivo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            if let goal {
+                Button("Excluir objetivo", role: .destructive) {
+                    model.deleteGoal(goal.id)
+                    model.route = .home
+                    dismiss()
+                }
+            }
+        }
         .onAppear {
             if let goal {
                 activityIDs = Set(model.activities(forGoal: goal.id).map(\.id))

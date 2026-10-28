@@ -6,20 +6,18 @@ import SwiftUI
 struct HomeScreen: View {
     @Environment(AppModel.self) private var model
     @State private var newTask = ""
+    @State private var creatingTask = false
+    @State private var editingTask: TaskItem?
+    @State private var deletingTask: TaskItem?
 
     var body: some View {
         let now = model.now
         let threads = model.threads
-        let stalled = threads.filter { $0.state == .stalled }
         let active = threads.filter { $0.state == .active || $0.state == .stalled }
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(greeting(now)).font(.system(size: 32, weight: .bold))
-                    Text(now.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized)
-                        .foregroundStyle(Theme.secondaryText)
-                }
+            VStack(alignment: .leading, spacing: 14) {
+                ScreenHeading(section: "Início", title: greeting(now), subtitle: now.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized + " · seu dia com clareza")
 
                 StartBox()
 
@@ -34,32 +32,36 @@ struct HomeScreen: View {
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                 }
 
-                if !stalled.isEmpty {
-                    PageSection(title: "Paradas") {
-                        ForEach(stalled, id: \.goal.id) { thread in
-                            StalledCard(thread: thread)
-                        }
-                    }
-                }
-
                 PageSection(title: "Meu dia") {
                     dayContent(now)
+                } accessory: {
+                    Button("Ver agenda →") { model.route = .agenda }.buttonStyle(.plain)
                 }
 
                 if !active.isEmpty {
-                    PageSection(title: "Frentes") {
+                    PageSection(title: "Retomar de onde parei") {
                         ForEach(active, id: \.goal.id) { thread in
                             ThreadRow(thread: thread)
                         }
                     }
                 }
 
-                WeekPlan(threads: threads.filter { $0.state != .closed })
+                HStack(spacing: 8) {
+                    Button("Nova tarefa") { creatingTask = true }
+                        .buttonStyle(AppActionButtonStyle(width: 288))
+                    Button("Nova nota") { if let note = model.notes.create() { model.route = .note(note.url) } }
+                        .buttonStyle(AppActionButtonStyle(width: 288))
+                }
             }
-            .padding(48)
-            .frame(maxWidth: 820, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
+            .frame(maxWidth: 888, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .sheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
+        .sheet(item: $editingTask) { TaskEditor(task: $0) }
+        .confirmationDialog("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
+            Button("Excluir tarefa", role: .destructive) { model.deleteTask(task.id); deletingTask = nil }
+        } message: { _ in Text("A tarefa será removida.") }
     }
 
     @ViewBuilder
@@ -75,10 +77,22 @@ struct HomeScreen: View {
             } else if events.isEmpty {
                 Text("Nenhuma reunião hoje.").foregroundStyle(Theme.secondaryText)
             } else {
-                ForEach(events) { EventRow(event: $0, now: now) }
+                ForEach(events) { event in
+                    EventRow(event: event, now: now)
+                        .contentShape(Rectangle())
+                        .onTapGesture { model.route = .agenda }
+                }
             }
             Divider()
-            ForEach(model.todayTasks) { TaskRow(task: $0) }
+            ForEach(model.todayTasks) { task in
+                TaskRow(task: task)
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingTask = task }
+                    .contextMenu {
+                        Button("Editar") { editingTask = task }
+                        Button("Excluir", role: .destructive) { deletingTask = task }
+                    }
+            }
             TextField("Nova tarefa para hoje (Enter para adicionar)", text: $newTask)
                 .textFieldStyle(.plain)
                 .onSubmit(addTask)
@@ -109,11 +123,13 @@ struct HomeScreen: View {
 /// "No que você vai trabalhar agora?": type to pick an area (or create one) and the timer starts.
 struct StartBox: View {
     @Environment(AppModel.self) private var model
-    @State private var query = ""
+    @State private var showingNewActivity = false
 
     var body: some View {
-        let matches = self.matches
         VStack(alignment: .leading, spacing: 12) {
+            Text("Começar agora").font(Theme.font(size: 14, weight: .semibold))
+            Text("Escolha uma área; só iniciaremos quando você confirmar.")
+                .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
             if let running = model.runningActivity {
                 HStack(spacing: 8) {
                     Circle().fill(Color(hex: running.colorHex)).frame(width: 10, height: 10)
@@ -123,83 +139,34 @@ struct StartBox: View {
                     Button("Pausar") { model.toggle(running.id) }
                 }
             }
-            TextField("No que você vai trabalhar agora?", text: $query)
-                .textFieldStyle(.plain)
-                .font(.system(size: 18))
-                .onSubmit(startFirst)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(matches) { area in
-                        Button {
-                            model.start(area.id)
-                            query = ""
-                        } label: {
-                            HStack(spacing: 6) {
-                                IconView(icon: area.icon, base: model.imagesFolder, fallback: "circle.fill", size: 14)
-                                    .foregroundStyle(Color(hex: area.colorHex))
-                                Text(area.name)
-                                Image(systemName: "play.fill").font(.caption2).foregroundStyle(Theme.secondaryText)
-                            }
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Capsule().stroke(Theme.border))
+            ForEach(model.activeActivities) { area in
+                Button { model.route = .timer } label: {
+                    HStack(spacing: 6) {
+                        IconView(icon: area.icon, base: model.imagesFolder, fallback: "circle.fill", size: 14)
+                            .foregroundStyle(Color(hex: area.colorHex))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(area.name).foregroundStyle(Theme.text)
+                            Text(area.goalID.flatMap(model.goal)?.title ?? "Área independente")
+                                .font(Theme.font(size: 10)).foregroundStyle(Theme.secondaryText)
                         }
-                        .buttonStyle(.plain)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Theme.secondaryText)
                     }
-                    if matches.isEmpty, !trimmed.isEmpty {
-                        Text("Enter cria a área “\(trimmed)” e começa a contar").foregroundStyle(Theme.secondaryText)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
                 }
-            }
-        }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
-    }
-
-    private var trimmed: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    private var matches: [Activity] {
-        guard !trimmed.isEmpty else { return model.activeActivities }
-        return model.activeActivities.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
-    }
-
-    private func startFirst() {
-        guard !trimmed.isEmpty else { return }
-        let area = matches.first ?? model.addActivity(name: trimmed, colorHex: Palette.colors.randomElement()!)
-        model.start(area.id)
-        query = ""
-    }
-}
-
-/// A stalled objective, with the three deliberate ways out.
-private struct StalledCard: View {
-    @Environment(AppModel.self) private var model
-    let thread: GoalThread
-
-    var body: some View {
-        let goal = thread.goal
-        HStack(spacing: 10) {
-            IconView(icon: goal.icon, base: model.imagesFolder, fallback: "flag", size: 20)
-            Button("\(goal.title) · parado há \(GoalThreads.days(thread.idleDays))") { model.route = .goal(goal.id) }
                 .buttonStyle(.plain)
-                .fontWeight(.medium)
-            Spacer()
-            Button("Retomar") { resume() }
-            Button("Pausar") { model.setGoalStatus(goal.id, .paused) }
-            Button("Encerrar") { model.setGoalStatus(goal.id, .closed) }
+            }
+            Button("Criar e começar outra área   ›") { showingNewActivity = true }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.text)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
+        .padding(20)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border.opacity(0.5)))
+        .sheet(isPresented: $showingNewActivity) { ActivityEditor(activity: nil) }
     }
 
-    /// Starts the area worked on last (or the goal's first area) and opens the goal.
-    private func resume() {
-        let goalID = thread.goal.id
-        let areas = model.activities(forGoal: goalID).filter { !$0.isArchived }
-        let last = thread.lastSession.map(\.activityID).flatMap { id in areas.first { $0.id == id } }
-        if let area = last ?? areas.first { model.start(area.id) }
-        model.route = .goal(goalID)
-    }
 }
 
 /// An objective's progress in one line.
@@ -235,41 +202,6 @@ private struct ThreadRow: View {
             return "\(DurationFormat.short(progress.loggedSeconds)) de \(DurationFormat.short(target))"
         }
         return DurationFormat.short(progress.loggedSeconds)
-    }
-}
-
-/// This week: intended versus real, per objective, plus areas without one.
-struct WeekPlan: View {
-    @Environment(AppModel.self) private var model
-    let threads: [GoalThread]
-
-    var body: some View {
-        let rows = threads.filter { $0.weeklyTargetSeconds != nil || $0.weekSeconds > 0 }
-        let loose = model.looseAreasWeekTotal
-        if !rows.isEmpty || loose > 0 {
-            PageSection(title: "Esta semana · pretendido × real") {
-                ForEach(rows, id: \.goal.id) { thread in
-                    row(title: thread.goal.title, real: thread.weekSeconds, intended: thread.weeklyTargetSeconds)
-                }
-                if loose > 0 {
-                    row(title: "Áreas soltas", real: loose, intended: nil)
-                }
-            }
-        }
-    }
-
-    private func row(title: String, real: TimeInterval, intended: TimeInterval?) -> some View {
-        HStack(spacing: 10) {
-            Text(title).frame(width: 200, alignment: .leading).lineLimit(1)
-            if let intended, intended > 0 {
-                ProgressView(value: min(1, real / intended)).tint(real >= intended ? .green : Theme.accent)
-                Text("\(DurationFormat.short(real)) de \(DurationFormat.short(intended))")
-                    .monospacedDigit().foregroundStyle(Theme.secondaryText).frame(width: 150, alignment: .trailing)
-            } else {
-                Spacer()
-                Text(DurationFormat.short(real)).monospacedDigit().foregroundStyle(Theme.secondaryText)
-            }
-        }
     }
 }
 
