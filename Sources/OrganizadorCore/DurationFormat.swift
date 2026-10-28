@@ -22,3 +22,17 @@ public enum DurationFormat {
         }
     }
 }
+
+extension DurationFormat {
+    /// "18h40", "6h", "30min" — the report's compact hours.
+    public static func compact(_ seconds: TimeInterval) -> String {
+        let totalMinutes = max(0, Int((seconds / 60).rounded(.down)))
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        switch (hours, minutes) {
+        case (0, _): return "\(minutes)min"
+        case (_, 0): return "\(hours)h"
+        default: return String(format: "%dh%02d", hours, minutes)
+        }
+    }
+}
