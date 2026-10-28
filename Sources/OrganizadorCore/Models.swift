@@ -89,6 +89,20 @@ public struct Preferences: Codable, Hashable, Sendable {
         self.dailyTargetMinutes = dailyTargetMinutes
         self.idlePauseMinutes = idlePauseMinutes
     }
+
+    private enum CodingKeys: String, CodingKey { case dailyTargetMinutes, idlePauseMinutes }
+
+    // Missing keys fall back to defaults, so files from older versions keep loading.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Preferences()
+        self.init(
+            dailyTargetMinutes: try container.decodeIfPresent(Int.self, forKey: .dailyTargetMinutes)
+                ?? defaults.dailyTargetMinutes,
+            idlePauseMinutes: try container.decodeIfPresent(Int.self, forKey: .idlePauseMinutes)
+                ?? defaults.idlePauseMinutes
+        )
+    }
 }
 
 /// Everything the app stores, saved as a single JSON file.
@@ -119,4 +133,23 @@ public struct AppData: Codable, Hashable, Sendable {
     }
 
     public static let empty = AppData()
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, activities, goals, sessions, running, preferences
+    }
+
+    // Missing keys fall back to defaults, so files from older versions keep loading
+    // when new collections (tasks, habits, ...) are added.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            schemaVersion: try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
+                ?? AppData.currentSchemaVersion,
+            activities: try container.decodeIfPresent([Activity].self, forKey: .activities) ?? [],
+            goals: try container.decodeIfPresent([Goal].self, forKey: .goals) ?? [],
+            sessions: try container.decodeIfPresent([FocusSession].self, forKey: .sessions) ?? [],
+            running: try container.decodeIfPresent(RunningTimer.self, forKey: .running),
+            preferences: try container.decodeIfPresent(Preferences.self, forKey: .preferences) ?? Preferences()
+        )
+    }
 }

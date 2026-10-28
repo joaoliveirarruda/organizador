@@ -106,6 +106,15 @@ final class StatsTests: XCTestCase {
         XCTAssertEqual(segments[1].startFraction, 0.75, accuracy: 1e-9)
     }
 
+    func testWeekContainingDate() {
+        var sundayFirst = calendar
+        sundayFirst.firstWeekday = 1
+        // 2026-10-28 is a Wednesday.
+        let week = Stats.week(containing: date(28, 12), calendar: sundayFirst)
+        XCTAssertEqual(week.start, date(25, 0))
+        XCTAssertEqual(week.end, date(25, 0).addingTimeInterval(7 * 86_400))
+    }
+
     func testDailyTotalsSkipEmptyDays() {
         let spans = [
             TimeSpan(activityID: english, start: date(22, 9), end: date(22, 10)),
@@ -177,6 +186,15 @@ final class JSONStoreTests: XCTestCase {
         )
         try store.save(data)
         XCTAssertEqual(try store.load(), data)
+    }
+
+    func testLoadsFileFromOlderVersionWithMissingKeys() throws {
+        let json = #"{"activities":[],"sessions":[],"preferences":{"dailyTargetMinutes":120}}"#
+        let data = try JSONStore.makeDecoder().decode(AppData.self, from: Data(json.utf8))
+        XCTAssertEqual(data.goals, [])
+        XCTAssertNil(data.running)
+        XCTAssertEqual(data.preferences, Preferences(dailyTargetMinutes: 120, idlePauseMinutes: 10))
+        XCTAssertEqual(data.schemaVersion, AppData.currentSchemaVersion)
     }
 }
 
