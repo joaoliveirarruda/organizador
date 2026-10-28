@@ -1,1 +1,47 @@
-# organizador
+# Organizador
+
+App nativo para macOS para organizar a vida: cronômetro por atividade, metas, tarefas, hábitos, agenda e finanças, num lugar só. O tempo que você cronometra em cada atividade vira progresso nas suas metas.
+
+Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquivo JSON legível.
+
+## O que já funciona
+
+**Cronômetro** (inspirado no Yeolpumta):
+
+- Atividades coloridas; um clique inicia, outro pausa. Trocar de atividade fecha a sessão anterior.
+- Tempo do dia sempre na barra de menu, com painel para iniciar e pausar sem abrir a janela.
+- Linha do tempo do dia (0 h a 24 h) com um bloco para cada sessão.
+- Meta diária de tempo focado, com barra de progresso.
+- Pausa automática quando você fica sem usar o Mac (padrão: 10 min) ou quando ele entra em repouso. O tempo parado não conta.
+- Histórico por dia, com edição e inclusão manual de sessões.
+- Estatísticas de 7 e 30 dias por atividade.
+
+## Próximos passos
+
+1. Metas (com alvo em horas e ritmo semanal), tarefas e hábitos.
+2. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
+3. Finanças: lançamentos, categorias, orçamento e importação de extrato.
+
+## Como rodar
+
+Precisa de macOS 14 (Sonoma) ou mais novo e Xcode 16.
+
+- **No Xcode:** abra a pasta do projeto (ou o `Package.swift`), escolha o esquema `Organizador` e aperte ⌘R.
+- **No terminal:** `swift run Organizador`
+- **Gerar o app:** `./scripts/build-app.sh` cria `dist/Organizador.app`, que você pode arrastar para Aplicativos.
+
+Testes: `swift test`.
+
+## Estrutura
+
+| Pasta | O que tem |
+| --- | --- |
+| `Sources/OrganizadorCore` | Regras sem interface: modelos, cronômetro, estatísticas, metas, salvamento em JSON |
+| `Sources/Organizador` | O app SwiftUI: janela, barra de menu, ajustes |
+| `Tests/OrganizadorCoreTests` | Testes do núcleo |
+
+Os dados ficam em `~/Library/Application Support/Organizador/data.json`.
+
+## Licença
+
+[MIT](LICENSE)
