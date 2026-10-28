@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A page of the main window.
 enum Route: Hashable {
-    case home, search, timer, agenda, notes, tasks, habits, finance, settings
+    case home, search, timer, report, agenda, notes, tasks, habits, finance, settings
     case settingsSection(String)
     case goal(UUID)
     case area(UUID)
@@ -46,6 +46,7 @@ struct ContentView: View {
         case .home: HomeScreen()
         case .search: SearchScreen()
         case .timer: TimerScreen()
+        case .report: ReportScreen()
         case .agenda: AgendaScreen()
         case .notes: NotesScreen()
         case .tasks: TasksScreen()
@@ -89,6 +90,7 @@ private struct Sidebar: View {
                 SidebarRow(title: "Buscar", symbol: "magnifyingglass", route: .search)
                 SidebarRow(title: "Início", symbol: "house", route: .home)
                 SidebarRow(title: "Cronômetro", symbol: "timer", route: .timer)
+                SidebarRow(title: "Relatório", symbol: "chart.bar", route: .report)
                 SidebarRow(title: "Agenda", symbol: "calendar", route: .agenda)
                 SidebarRow(title: "Tarefas", symbol: "checklist", route: .tasks)
                 SidebarRow(title: "Hábitos", symbol: "repeat", route: .habits)

@@ -297,6 +297,11 @@ final class AppModel {
         persist()
     }
 
+    func report(_ period: ReportPeriod) -> (interval: DateInterval?, areas: [TimeReport.AreaTotal]) {
+        guard let interval = TimeReport.interval(period, spans: spans, now: now, calendar: calendar) else { return (nil, []) }
+        return (interval, TimeReport.build(spans: spans, activities: data.activities, areas: data.areas, in: interval))
+    }
+
     // MARK: - Goals
 
     func goal(_ id: UUID) -> Goal? {
