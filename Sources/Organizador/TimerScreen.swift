@@ -131,10 +131,28 @@ struct ActivityToggleRow: View {
 /// A 24-hour bar with a colored block for each span of timed work.
 struct DayTimeline: View {
     let segments: [Stats.TimelineSegment]
+    /// Meetings drawn as a thin bar above the timed work, as fractions of the day.
+    var meetings: [ClosedRange<Double>] = []
     let color: (UUID) -> Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if !meetings.isEmpty {
+                GeometryReader { geometry in
+                    let width = geometry.size.width
+                    ZStack(alignment: .leading) {
+                        ForEach(meetings, id: \.self) { meeting in
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.accentColor.opacity(0.7))
+                                .frame(width: max(2, width * (meeting.upperBound - meeting.lowerBound)))
+                                .offset(x: width * meeting.lowerBound)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 8)
+                .help("Reuniões da agenda")
+            }
             GeometryReader { geometry in
                 let width = geometry.size.width
                 ZStack(alignment: .leading) {

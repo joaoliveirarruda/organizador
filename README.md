@@ -34,10 +34,15 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Calendário de constância das últimas 12 semanas; clique num dia para marcar ou desmarcar.
 - Marcação automática pelo cronômetro (ex.: "Ler 30 min" fica feito quando Leitura passa de 30 min no dia).
 
+**Hoje e Agenda:**
+
+- Tela "Hoje" com as reuniões do dia, a linha do tempo (reuniões em cima, tempo cronometrado embaixo), tarefas de hoje, hábitos e atividades.
+- Tela "Agenda" com os próximos 7 dias.
+- Lê o Google Agenda (ou qualquer agenda que exporte iCal) pelo link secreto colado nos Ajustes, com eventos recorrentes, exceções e eventos cancelados. Atualiza a cada 15 min e guarda uma cópia para usar sem internet.
+
 ## Próximos passos
 
-1. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
-2. Finanças: lançamentos, categorias, orçamento e importação de extrato.
+1. Finanças: lançamentos, categorias, orçamento e importação de extrato.
 
 ## Como rodar
 

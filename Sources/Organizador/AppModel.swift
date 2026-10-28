@@ -15,6 +15,8 @@ final class AppModel {
     var pauseNotice: String?
 
     let calendar = Calendar.current
+    /// Meetings from the user's calendar link.
+    let agenda: CalendarFeed
     private let store: JSONStore?
     /// False when the data file could not be read, so we never overwrite it with empty data.
     private let canSave: Bool
@@ -36,6 +38,9 @@ final class AppModel {
         }
 
         self.store = store
+        self.agenda = CalendarFeed(
+            cacheURL: store?.url.deletingLastPathComponent().appendingPathComponent("calendar.ics")
+        )
         self.canSave = loadError == nil
         self.data = loaded
         self.lastError = loadError
@@ -157,6 +162,7 @@ final class AppModel {
     private func tick() {
         now = Date()
         pauseIfIdle()
+        agenda.refreshIfDue(urlString: data.preferences.calendarURL)
     }
 
     private func pauseIfIdle() {
@@ -371,6 +377,30 @@ final class AppModel {
     func deleteSession(_ id: UUID) {
         data.sessions.removeAll { $0.id == id }
         persist()
+    }
+
+    // MARK: - Calendar
+
+    func calendarEvents(on day: Date) -> [CalendarEvent] {
+        agenda.occurrences(in: Stats.day(containing: day, calendar: calendar))
+    }
+
+    var hasCalendar: Bool { !data.preferences.calendarURL.isEmpty }
+
+    func setCalendarURL(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        data.preferences.calendarURL = trimmed
+        persist()
+        if trimmed.isEmpty {
+            agenda.clear()
+        } else {
+            agenda.refresh(urlString: trimmed)
+        }
+    }
+
+    func refreshCalendar() {
+        guard hasCalendar else { return }
+        agenda.refresh(urlString: data.preferences.calendarURL)
     }
 
     // MARK: - Preferences
