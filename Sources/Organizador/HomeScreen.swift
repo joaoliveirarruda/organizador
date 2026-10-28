@@ -2,55 +2,82 @@ import AppKit
 import OrganizadorCore
 import SwiftUI
 
-/// Home: a greeting, one box to start working, the day, and how every objective is doing.
+/// Hoje: one day at a time — meetings and timed work in one timeline, the day's tasks and habits.
+/// Today also gets the box to start working and how every objective is doing.
 struct HomeScreen: View {
     @Environment(AppModel.self) private var model
+    @State private var day = Date()
     @State private var newTask = ""
     @State private var creatingTask = false
     @State private var editingTask: TaskItem?
     @State private var deletingTask: TaskItem?
+    @State private var addingSession = false
+    @State private var editingSession: FocusSession?
+    @State private var addingHabit = false
 
     var body: some View {
         let now = model.now
+        let isToday = model.calendar.isDate(day, inSameDayAs: now)
         let threads = model.threads
         let active = threads.filter { $0.state == .active || $0.state == .stalled }
+        let date = day.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeading(section: "Início", title: greeting(now), subtitle: now.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized + " · seu dia com clareza")
+                ScreenHeading(section: "Hoje", title: isToday ? greeting(now) : date, subtitle: isToday ? date : nil) {
+                    PeriodStepper(currentTitle: "Hoje", isCurrent: isToday, step: shiftDay) { day = model.now }
+                }
 
-                StartBox()
-
-                if let notice = model.pauseNotice {
-                    HStack {
-                        Image(systemName: "pause.circle")
-                        Text(notice)
-                        Spacer()
-                        Button("OK") { model.pauseNotice = nil }
+                if isToday {
+                    StartBox()
+                    if let notice = model.pauseNotice {
+                        HStack {
+                            Image(systemName: "pause.circle")
+                            Text(notice)
+                            Spacer()
+                            Button("OK") { model.pauseNotice = nil }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                 }
 
-                PageSection(title: "Meu dia") {
-                    dayContent(now)
+                PageSection(title: "Agenda") {
+                    timeline
                 } accessory: {
-                    Button("Ver agenda →") { model.route = .agenda }.buttonStyle(.plain)
+                    if model.hasCalendar {
+                        CalendarSyncStatus()
+                        Button("Atualizar agenda", systemImage: "arrow.clockwise") { model.refreshCalendar() }
+                            .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                            .help("Atualizar agenda")
+                    }
+                    Button("Sessão", systemImage: "plus") { addingSession = true }
+                        .buttonStyle(.heading())
+                        .disabled(model.activeActivities.isEmpty)
+                        .help("Registrar uma sessão que o cronômetro não pegou")
                 }
 
-                if !active.isEmpty {
+                PageSection(title: "Tarefas") {
+                    tasks(isToday: isToday)
+                } accessory: {
+                    Button("Todas   ›") { model.route = .tasks }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                }
+
+                PageSection(title: "Hábitos") {
+                    habits
+                } accessory: {
+                    if !model.data.habits.isEmpty {
+                        Button("Constância   ›") { model.route = .habits }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                    }
+                    Button("Hábito", systemImage: "plus") { addingHabit = true }.buttonStyle(.heading())
+                }
+
+                if isToday && !active.isEmpty {
                     PageSection(title: "Retomar de onde parei") {
                         ForEach(active, id: \.goal.id) { thread in
                             ThreadRow(thread: thread)
                         }
                     }
-                }
-
-                HStack(spacing: 8) {
-                    Button("Nova tarefa") { creatingTask = true }
-                        .buttonStyle(AppActionButtonStyle(width: 288))
-                    Button("Nova nota") { if let note = model.notes.create() { model.route = .note(note.url) } }
-                        .buttonStyle(AppActionButtonStyle(width: 288))
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
@@ -59,32 +86,62 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
         .sheet(item: $editingTask) { TaskEditor(task: $0) }
+        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+        .sheet(item: $editingSession) { SessionEditor(session: $0) }
+        .sheet(isPresented: $addingHabit) { HabitEditor(habit: nil) }
         .confirmationDialog("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
             Button("Excluir tarefa", role: .destructive) { model.deleteTask(task.id); deletingTask = nil }
         } message: { _ in Text("A tarefa será removida.") }
     }
 
+    /// Meetings and timed sessions of the day, in the order they happen.
     @ViewBuilder
-    private func dayContent(_ now: Date) -> some View {
-        let events = model.calendarEvents(on: now)
-        let tracker = model.habitTracker
-        VStack(alignment: .leading, spacing: 10) {
-            if !model.hasCalendar {
-                HStack {
-                    Text("Conecte o Google Agenda para ver suas reuniões aqui.").foregroundStyle(Theme.secondaryText)
-                    SettingsLink { Text("Abrir Ajustes") }
-                }
-            } else if events.isEmpty {
-                Text("Nenhuma reunião hoje.").foregroundStyle(Theme.secondaryText)
-            } else {
-                ForEach(events) { event in
-                    EventRow(event: event, now: now)
+    private var timeline: some View {
+        let events = model.calendarEvents(on: day).map { DayItem.event($0) }
+        let sessions = model.data.sessions
+            .filter { model.calendar.isDate($0.start, inSameDayAs: day) }
+            .map { DayItem.session($0) }
+        let items = (events + sessions).sorted { $0.start < $1.start }
+        VStack(alignment: .leading, spacing: 8) {
+            if items.isEmpty {
+                Text(model.hasCalendar ? "Nenhum compromisso ou sessão neste dia." : "Nenhuma sessão neste dia.")
+                    .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+            }
+            ForEach(items) { item in
+                switch item {
+                case .event(let event):
+                    EventRow(event: event, now: model.now)
+                case .session(let session):
+                    DaySessionRow(session: session)
                         .contentShape(Rectangle())
-                        .onTapGesture { model.route = .agenda }
+                        .onTapGesture { editingSession = session }
                 }
             }
-            Divider()
-            ForEach(model.todayTasks) { task in
+            if !model.hasCalendar {
+                HStack(spacing: 6) {
+                    Text("Conecte uma agenda para ver seus compromissos aqui.").foregroundStyle(Theme.secondaryText)
+                    Button("Conectar   ›") { model.route = .settingsSection("Receber compromissos") }.buttonStyle(.plain)
+                }
+                .font(Theme.font(size: 12))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tasks(isToday: Bool) -> some View {
+        // Today includes what is overdue; another day shows only what is due on it.
+        let tasks = isToday ? model.todayTasks : model.data.tasks.filter { task in
+            !task.isDone && task.dueDate.map { model.calendar.isDate($0, inSameDayAs: day) } == true
+        }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus").foregroundStyle(Theme.secondaryText).frame(width: 22)
+                TextField("Nova tarefa para este dia (Enter para adicionar)", text: $newTask)
+                    .textFieldStyle(.plain)
+                    .onSubmit(addTask)
+                Button("Detalhes…") { creatingTask = true }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+            }
+            ForEach(tasks) { task in
                 TaskRow(task: task)
                     .contentShape(Rectangle())
                     .onTapGesture { editingTask = task }
@@ -93,16 +150,26 @@ struct HomeScreen: View {
                         Button("Excluir", role: .destructive) { deletingTask = task }
                     }
             }
-            TextField("Nova tarefa para hoje (Enter para adicionar)", text: $newTask)
-                .textFieldStyle(.plain)
-                .onSubmit(addTask)
-            if !model.data.habits.isEmpty {
-                Divider()
+        }
+    }
+
+    @ViewBuilder
+    private var habits: some View {
+        let tracker = model.habitTracker
+        if model.data.habits.isEmpty {
+            Text("Crie um hábito e marque aqui os dias em que fez. Ligado a uma atividade, o cronômetro marca sozinho.")
+                .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(model.data.habits) { habit in
-                    HabitTodayRow(habit: habit, tracker: tracker, now: now)
+                    HabitTodayRow(habit: habit, tracker: tracker, now: day)
                 }
             }
         }
+    }
+
+    private func shiftDay(_ amount: Int) {
+        day = model.calendar.date(byAdding: .day, value: amount, to: day) ?? day
     }
 
     private func greeting(_ now: Date) -> String {
@@ -115,8 +182,51 @@ struct HomeScreen: View {
     private func addTask() {
         let title = newTask.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        model.addTask(title: title, dueToday: true)
+        model.addTask(title: title, due: day)
         newTask = ""
+    }
+}
+
+/// A meeting or a timed session, so the day can list both in order.
+private enum DayItem: Identifiable {
+    case event(CalendarEvent)
+    case session(FocusSession)
+
+    var id: String {
+        switch self {
+        case .event(let event): "event-\(event.id)"
+        case .session(let session): "session-\(session.id)"
+        }
+    }
+
+    var start: Date {
+        switch self {
+        case .event(let event): event.start
+        case .session(let session): session.start
+        }
+    }
+}
+
+/// A timed session laid out like `EventRow`, with the activity's color. Click to edit.
+private struct DaySessionRow: View {
+    @Environment(AppModel.self) private var model
+    let session: FocusSession
+
+    var body: some View {
+        let activity = model.activity(session.activityID)
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text("\(session.start.formatted(date: .omitted, time: .shortened))–\(session.end.formatted(date: .omitted, time: .shortened))")
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+            HStack(spacing: 6) {
+                Circle().fill(Color(hex: activity?.colorHex ?? "")).frame(width: 8, height: 8)
+                Text(activity?.name ?? "Atividade removida")
+            }
+            Spacer()
+            Text(DurationFormat.short(session.duration)).monospacedDigit().foregroundStyle(.secondary)
+        }
+        .help("Sessão cronometrada · clique para editar")
     }
 }
 

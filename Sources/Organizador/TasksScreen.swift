@@ -128,7 +128,7 @@ struct TasksScreen: View {
     private func addTask() {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        model.addTask(title: title, dueToday: filter == .today)
+        model.addTask(title: title, due: filter == .today ? Date() : nil)
         newTitle = ""
     }
 }

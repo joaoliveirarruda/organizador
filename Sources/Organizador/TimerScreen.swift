@@ -72,7 +72,7 @@ struct TimerScreen: View {
                     Button("Adicionar sessão") { addingSession = true }
                         .buttonStyle(AppActionButtonStyle())
                         .disabled(model.activeActivities.isEmpty)
-                    Button("Agenda do dia") { model.route = .agenda }.buttonStyle(AppActionButtonStyle())
+                    Button("Agenda do dia") { model.route = .home }.buttonStyle(AppActionButtonStyle())
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)

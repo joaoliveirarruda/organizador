@@ -444,9 +444,8 @@ final class AppModel {
         TaskLists.isOverdue(task, now: now, calendar: calendar)
     }
 
-    func addTask(title: String, dueToday: Bool) {
-        let due = dueToday ? calendar.startOfDay(for: Date()) : nil
-        data.tasks.append(TaskItem(title: title, dueDate: due))
+    func addTask(title: String, due: Date?) {
+        data.tasks.append(TaskItem(title: title, dueDate: due.map(calendar.startOfDay)))
         persist()
     }
 
