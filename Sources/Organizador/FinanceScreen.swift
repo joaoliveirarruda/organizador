@@ -21,7 +21,7 @@ struct FinanceScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeading(
                     section: "Finanças",
-                    title: month.start.formatted(.dateTime.month(.wide).year()).capitalized
+                    title: month.start.formatted(.dateTime.month(.wide).year()).capitalizedFirst
                 ) {
                     PeriodStepper(currentTitle: "Este mês", isCurrent: month.contains(Date()), step: shiftMonth) { monthStart = Date() }
                     Button("Importar extrato") { choosingFile = true }.buttonStyle(.heading())

@@ -20,7 +20,7 @@ struct HomeScreen: View {
         let isToday = model.calendar.isDate(day, inSameDayAs: now)
         let threads = model.threads
         let active = threads.filter { $0.state == .active || $0.state == .stalled }
-        let date = day.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized
+        let date = day.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalizedFirst
 
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -47,9 +47,12 @@ struct HomeScreen: View {
                 } accessory: {
                     if model.hasCalendar {
                         CalendarSyncStatus()
-                        Button("Atualizar agenda", systemImage: "arrow.clockwise") { model.refreshCalendar() }
-                            .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
-                            .help("Atualizar agenda")
+                        Button { model.refreshCalendar() } label: {
+                            Image(systemName: "arrow.clockwise").frame(width: 28, height: 28).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                        .accessibilityLabel("Atualizar agenda")
+                        .help("Atualizar agenda")
                     }
                     Button("Sessão", systemImage: "plus") { addingSession = true }
                         .buttonStyle(.heading())

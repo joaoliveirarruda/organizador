@@ -307,19 +307,32 @@ struct PeriodStepper: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Button("Anterior", systemImage: "chevron.left") { step(-1) }
-                .labelStyle(.iconOnly).frame(width: 30, height: 30).help("Anterior")
-            Button(currentTitle, action: reset)
-                .disabled(isCurrent)
-                .padding(.horizontal, 6)
-            Button("Próximo", systemImage: "chevron.right") { step(1) }
-                .labelStyle(.iconOnly).frame(width: 30, height: 30).help("Próximo")
+            arrow("Anterior", "chevron.left") { step(-1) }
+            Button(action: reset) {
+                Text(currentTitle).padding(.horizontal, 6).frame(height: 30).contentShape(Rectangle())
+            }
+            .disabled(isCurrent)
+            arrow("Próximo", "chevron.right") { step(1) }
         }
         .buttonStyle(.plain)
         .font(Theme.font(size: 13, weight: .medium))
         .contentShape(Rectangle())
         .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
     }
+
+    /// The whole 30×30 square is clickable, not just the chevron.
+    private func arrow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).frame(width: 30, height: 30).contentShape(Rectangle())
+        }
+        .accessibilityLabel(title)
+        .help(title)
+    }
+}
+
+extension String {
+    /// "Quarta-feira, 28 de outubro": only the first letter goes up, unlike `capitalized`.
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 extension PageSection where Accessory == EmptyView {
