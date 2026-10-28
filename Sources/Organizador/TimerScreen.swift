@@ -1,61 +1,53 @@
 import OrganizadorCore
 import SwiftUI
 
+/// The timer, Yeolpumta style: today's total in the running area's color, every area one click away,
+/// and the day's calendar with meetings and timed blocks side by side.
 struct TimerScreen: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewActivity = false
     @State private var editingActivity: Activity?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                TodaySummary()
+        HStack(alignment: .top, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    TimerHeader()
 
-                if let notice = model.pauseNotice {
-                    HStack {
-                        Image(systemName: "pause.circle")
-                        Text(notice)
-                        Spacer()
-                        Button("OK") { model.pauseNotice = nil }
+                    if let notice = model.pauseNotice {
+                        HStack {
+                            Image(systemName: "pause.circle")
+                            Text(notice)
+                            Spacer()
+                            Button("OK") { model.pauseNotice = nil }
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.yellow.opacity(0.15)))
-                }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Linha do tempo de hoje").font(.headline)
-                    DayTimeline(segments: model.todayTimeline) { id in
-                        Color(hex: model.activity(id)?.colorHex ?? "")
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Atividades").font(.headline)
-                    if model.activeActivities.isEmpty {
-                        Text("Crie uma atividade para começar a cronometrar.")
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(model.activeActivities) { activity in
-                        ActivityToggleRow(activity: activity)
-                            .contextMenu {
-                                Button("Editar") { editingActivity = activity }
-                                Button("Arquivar", role: .destructive) { model.archiveActivity(activity.id) }
-                            }
+                    PageSection(title: "Áreas") {
+                        if model.activeActivities.isEmpty {
+                            Text("Crie uma área para começar a cronometrar.").foregroundStyle(Theme.secondaryText)
+                        }
+                        ForEach(model.activeActivities) { area in
+                            AreaTimerRow(area: area)
+                                .contextMenu {
+                                    Button("Abrir") { model.route = .area(area.id) }
+                                    Button("Editar") { editingActivity = area }
+                                    Button("Arquivar", role: .destructive) { model.archiveActivity(area.id) }
+                                }
+                        }
+                    } accessory: {
+                        Button("Nova área", systemImage: "plus") { showingNewActivity = true }
+                            .buttonStyle(.borderless)
                     }
                 }
+                .padding(40)
+                .frame(maxWidth: 640, alignment: .leading)
             }
-            .padding(24)
-            .frame(maxWidth: 720, alignment: .leading)
-        }
-        .navigationTitle("Cronômetro")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    showingNewActivity = true
-                } label: {
-                    Label("Nova atividade", systemImage: "plus")
-                }
-            }
+            Divider()
+            DayCalendar(day: model.now)
+                .frame(width: 300)
         }
         .sheet(isPresented: $showingNewActivity) {
             ActivityEditor(activity: nil)
@@ -66,30 +58,170 @@ struct TimerScreen: View {
     }
 }
 
-struct TodaySummary: View {
+/// Today's total, tinted with the running area's color, plus the D-day and the daily target.
+private struct TimerHeader: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let total = model.todayTotal
         let target = model.dailyTarget
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Hoje").font(.headline).foregroundStyle(.secondary)
+        let running = model.runningActivity
+        let goal = running?.goalID.flatMap(model.goal)
+        let color = running.map { Color(hex: $0.colorHex) } ?? Theme.text
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Text("Hoje").foregroundStyle(Theme.secondaryText)
+                if let goal, let deadline = goal.deadline {
+                    Text("\(dDay(deadline, now: model.now, calendar: model.calendar)) · \(goal.title)")
+                        .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(Capsule().fill(color.opacity(0.15)))
+                }
+            }
             Text(DurationFormat.clock(total))
-                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                .font(.system(size: 64, weight: .semibold, design: .rounded))
                 .monospacedDigit()
-            if let activity = model.runningActivity {
-                Label("\(activity.name) · \(DurationFormat.clock(model.currentElapsed))", systemImage: "record.circle")
-                    .foregroundStyle(Color(hex: activity.colorHex))
+                .foregroundStyle(color)
+            if let running {
+                Label("\(running.name) · \(DurationFormat.clock(model.currentElapsed))", systemImage: "record.circle")
+                    .foregroundStyle(color)
             }
             if target > 0 {
-                ProgressView(value: min(1, total / target))
+                ProgressView(value: min(1, total / target)).tint(color)
                 Text(total >= target
-                    ? "Meta diária de \(DurationFormat.short(target)) batida"
-                    : "Meta diária \(DurationFormat.short(target)) · faltam \(DurationFormat.short(target - total))")
+                    ? "Meta do dia de \(DurationFormat.short(target)) cumprida"
+                    : "\(Int(total / target * 100))% da meta do dia (\(DurationFormat.short(target))) · faltam \(DurationFormat.short(target - total))")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
+    }
+}
+
+/// An area with ▶, its objective and progress, and today's time.
+private struct AreaTimerRow: View {
+    @Environment(AppModel.self) private var model
+    let area: Activity
+
+    var body: some View {
+        let isRunning = model.running?.activityID == area.id
+        let color = Color(hex: area.colorHex)
+        let goal = area.goalID.flatMap(model.goal)
+        HStack(spacing: 12) {
+            Button { model.toggle(area.id) } label: {
+                Image(systemName: isRunning ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.title)
+                    .foregroundStyle(color)
+            }
+            .buttonStyle(.plain)
+            .help(isRunning ? "Pausar" : "Começar")
+            Button { model.route = .area(area.id) } label: {
+                HStack(spacing: 8) {
+                    IconView(icon: area.icon, base: model.imagesFolder, fallback: "circle.fill", size: 18)
+                        .foregroundStyle(color)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(area.name).font(.system(size: 15, weight: .medium))
+                        if let goal {
+                            HStack(spacing: 6) {
+                                Text(goal.title).font(.caption).foregroundStyle(Theme.secondaryText)
+                                if let fraction = model.progress(for: goal).fraction {
+                                    ProgressView(value: fraction).tint(color).frame(width: 80)
+                                }
+                            }
+                        }
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Text(DurationFormat.clock(model.todayTotal(for: area.id)))
+                .monospacedDigit()
+                .foregroundStyle(isRunning ? Theme.text : Theme.secondaryText)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(isRunning ? color.opacity(0.15) : Theme.card))
+    }
+}
+
+/// The day hour by hour: meetings from the agenda next to the timed blocks. Click a block to edit it.
+struct DayCalendar: View {
+    @Environment(AppModel.self) private var model
+    let day: Date
+    @State private var editingSession: FocusSession?
+    @State private var addingSession = false
+    private let hourHeight: CGFloat = 44
+
+    var body: some View {
+        let interval = Stats.day(containing: day, calendar: model.calendar)
+        let events = model.calendarEvents(on: day).filter { !$0.isAllDay }
+        let sessions = model.data.sessions.filter { $0.end > interval.start && $0.start < interval.end }
+        VStack(spacing: 0) {
+            HStack {
+                Text("Calendário do dia").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                Spacer()
+                Button { addingSession = true } label: { Image(systemName: "plus") }
+                    .buttonStyle(.borderless)
+                    .help("Incluir sessão à mão")
+                    .disabled(model.activeActivities.isEmpty)
+            }
+            .padding(12)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    ZStack(alignment: .topLeading) {
+                        VStack(spacing: 0) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                HStack(alignment: .top) {
+                                    Text("\(hour)h").font(.caption2).foregroundStyle(Theme.secondaryText).frame(width: 28, alignment: .trailing)
+                                    VStack { Divider() }
+                                }
+                                .frame(height: hourHeight, alignment: .top)
+                                .id(hour)
+                            }
+                        }
+                        ForEach(events) { event in
+                            block(start: event.start, end: event.end, in: interval, column: 0) {
+                                Text(event.title).font(.caption2).lineLimit(2)
+                            }
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Theme.accent.opacity(0.18)))
+                        }
+                        ForEach(sessions) { session in
+                            let area = model.activity(session.activityID)
+                            block(start: session.start, end: session.end, in: interval, column: 1) {
+                                Text(area?.name ?? "").font(.caption2).lineLimit(2)
+                            }
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: area?.colorHex ?? "").opacity(0.35)))
+                            .onTapGesture { editingSession = session }
+                            .help("Clique para editar")
+                        }
+                        if let running = model.running, let area = model.activity(running.activityID) {
+                            block(start: running.startedAt, end: model.now, in: interval, column: 1) {
+                                Text(area.name).font(.caption2).lineLimit(1)
+                            }
+                            .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: area.colorHex).opacity(0.6)))
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .onAppear { proxy.scrollTo(max(0, model.calendar.component(.hour, from: model.now) - 2), anchor: .top) }
+            }
+        }
+        .background(Theme.sidebar)
+        .sheet(item: $editingSession) { SessionEditor(session: $0) }
+        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+    }
+
+    /// Meetings go in the left column, timed work in the right one.
+    private func block<Label: View>(
+        start: Date, end: Date, in interval: DateInterval, column: Int, @ViewBuilder label: () -> Label
+    ) -> some View {
+        let top = CGFloat(max(start, interval.start).timeIntervalSince(interval.start) / 3600) * hourHeight
+        let height = max(14, CGFloat(min(end, interval.end).timeIntervalSince(max(start, interval.start)) / 3600) * hourHeight)
+        return label()
+            .padding(.horizontal, 4)
+            .frame(width: 112, height: height, alignment: .topLeading)
+            .offset(x: 36 + CGFloat(column) * 116, y: top)
     }
 }
 
@@ -128,58 +260,6 @@ struct ActivityToggleRow: View {
     }
 }
 
-/// A 24-hour bar with a colored block for each span of timed work.
-struct DayTimeline: View {
-    let segments: [Stats.TimelineSegment]
-    /// Meetings drawn as a thin bar above the timed work, as fractions of the day.
-    var meetings: [ClosedRange<Double>] = []
-    let color: (UUID) -> Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if !meetings.isEmpty {
-                GeometryReader { geometry in
-                    let width = geometry.size.width
-                    ZStack(alignment: .leading) {
-                        ForEach(meetings, id: \.self) { meeting in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.accentColor.opacity(0.7))
-                                .frame(width: max(2, width * (meeting.upperBound - meeting.lowerBound)))
-                                .offset(x: width * meeting.lowerBound)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(height: 8)
-                .help("Reuniões da agenda")
-            }
-            GeometryReader { geometry in
-                let width = geometry.size.width
-                ZStack(alignment: .leading) {
-                    Rectangle().fill(Color.secondary.opacity(0.12))
-                    ForEach(segments, id: \.self) { segment in
-                        Rectangle()
-                            .fill(color(segment.activityID))
-                            .frame(width: max(1, width * (segment.endFraction - segment.startFraction)))
-                            .offset(x: width * segment.startFraction)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .frame(height: 28)
-
-            HStack {
-                ForEach([0, 6, 12, 18, 24], id: \.self) { hour in
-                    Text("\(hour)h")
-                    if hour != 24 { Spacer() }
-                }
-            }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-        }
-    }
-}
-
 struct ActivityEditor: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -188,16 +268,16 @@ struct ActivityEditor: View {
     @State private var colorHex: String
     @State private var goalID: UUID?
 
-    init(activity: Activity?) {
+    init(activity: Activity?, goalID: UUID? = nil) {
         self.activity = activity
         _name = State(initialValue: activity?.name ?? "")
         _colorHex = State(initialValue: activity?.colorHex ?? Palette.colors[3])
-        _goalID = State(initialValue: activity?.goalID)
+        _goalID = State(initialValue: activity?.goalID ?? goalID)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(activity == nil ? "Nova atividade" : "Editar atividade").font(.headline)
+            Text(activity == nil ? "Nova área" : "Editar área").font(.headline)
             TextField("Nome", text: $name)
                 .textFieldStyle(.roundedBorder)
             HStack(spacing: 8) {
@@ -209,9 +289,9 @@ struct ActivityEditor: View {
                         .onTapGesture { colorHex = hex }
                 }
             }
-            Picker("Conta para a meta", selection: $goalID) {
-                Text("Nenhuma").tag(UUID?.none)
-                ForEach(model.sortedGoals) { goal in
+            Picker("Conta para o objetivo", selection: $goalID) {
+                Text("Nenhum (área solta)").tag(UUID?.none)
+                ForEach(model.activeGoals) { goal in
                     Text(goal.title).tag(Optional(goal.id))
                 }
             }

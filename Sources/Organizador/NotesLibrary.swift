@@ -69,9 +69,9 @@ final class NotesLibrary {
 
     /// Creates a note and selects it.
     @discardableResult
-    func create(title: String = "Sem título") -> Note? {
+    func create(title: String = "Sem título", body: String = "") -> Note? {
         do {
-            let note = try store.create(title: title)
+            let note = try store.create(title: title, body: body)
             notes.insert(note, at: 0)
             selectedURL = note.url
             return note
@@ -119,6 +119,15 @@ final class NotesLibrary {
         } catch {
             onError(error.localizedDescription)
         }
+    }
+
+    /// Points `[[old]]` links at `new` in every note, e.g. after an objective is renamed.
+    func rewriteLinks(from old: String, to new: String) {
+        for note in notes {
+            let body = WikiLinks.rewrite(note.body, from: old, to: new)
+            if body != note.body { setBody(body, of: note.url) }
+        }
+        saveNow()
     }
 
     func trash(_ note: Note) {

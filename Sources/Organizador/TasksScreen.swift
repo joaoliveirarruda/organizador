@@ -187,7 +187,7 @@ struct TaskEditor: View {
                     Text("Normal").tag(TaskPriority.normal)
                     Text("Alta").tag(TaskPriority.high)
                 }
-                Picker("Meta", selection: $goalID) {
+                Picker("Objetivo", selection: $goalID) {
                     Text("Nenhuma").tag(UUID?.none)
                     ForEach(model.sortedGoals) { goal in
                         Text(goal.title).tag(Optional(goal.id))

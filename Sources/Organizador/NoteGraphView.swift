@@ -42,7 +42,7 @@ struct NoteGraphView: View {
         .overlay(alignment: .bottomTrailing) {
             HStack {
                 Legend(color: .accentColor, title: "Nota")
-                Legend(color: Color(hex: Palette.colors[4]), title: "Meta")
+                Legend(color: Color(hex: Palette.colors[4]), title: "Objetivo")
                 Legend(color: Color(hex: Palette.colors[2]), title: "Tarefa")
                 Button("Centralizar") {
                     offset = .zero

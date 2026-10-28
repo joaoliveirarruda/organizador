@@ -1,61 +1,6 @@
 import OrganizadorCore
 import SwiftUI
 
-/// Meetings for the next 7 days.
-struct AgendaScreen: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let calendar = model.calendar
-        let today = calendar.startOfDay(for: model.now)
-        let days = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
-        let end = calendar.date(byAdding: .day, value: 7, to: today) ?? today
-        let events = model.agenda.occurrences(in: DateInterval(start: today, end: end))
-
-        Group {
-            if !model.hasCalendar {
-                CalendarSetupPrompt()
-            } else {
-                List {
-                    ForEach(days, id: \.self) { day in
-                        let interval = Stats.day(containing: day, calendar: calendar)
-                        let dayEvents = events.filter { $0.start < interval.end && $0.end > interval.start }
-                        Section(dayTitle(day, today: today)) {
-                            if dayEvents.isEmpty {
-                                Text("Nada marcado").foregroundStyle(.secondary)
-                            }
-                            ForEach(dayEvents) { event in
-                                EventRow(event: event, now: model.now)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Agenda")
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    model.refreshCalendar()
-                } label: {
-                    Label("Atualizar", systemImage: "arrow.clockwise")
-                }
-                .disabled(!model.hasCalendar || model.agenda.isSyncing)
-            }
-            ToolbarItem {
-                CalendarSyncStatus()
-            }
-        }
-    }
-
-    private func dayTitle(_ day: Date, today: Date) -> String {
-        let formatted = day.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        if day == today { return "Hoje · \(formatted)" }
-        if model.calendar.date(byAdding: .day, value: 1, to: today) == day { return "Amanhã · \(formatted)" }
-        return formatted
-    }
-}
-
 struct EventRow: View {
     let event: CalendarEvent
     let now: Date
@@ -131,19 +76,5 @@ struct CalendarSyncStatus: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-    }
-}
-
-struct CalendarSetupPrompt: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label("Conecte sua agenda", systemImage: "calendar.badge.plus")
-        } description: {
-            Text("Cole nos Ajustes o \"endereço secreto no formato iCal\" do Google Agenda para ver suas reuniões aqui.")
-        } actions: {
-            SettingsLink {
-                Text("Abrir Ajustes")
-            }
-        }
     }
 }

@@ -13,17 +13,22 @@ final class AppModel {
     var lastError: String?
     /// Shown when the timer was paused automatically (idle or sleep).
     var pauseNotice: String?
+    /// The page shown in the main window.
+    var route: Route = .home
 
     let calendar = Calendar.current
     /// Meetings from the user's calendar link.
     let agenda: CalendarFeed
     /// The notes folder.
     let notes: NotesLibrary
+    /// Writes finished sessions to the macOS Calendar.
+    let calendarExport = CalendarExporter()
     private let store: JSONStore?
     /// False when the data file could not be read, so we never overwrite it with empty data.
     private let canSave: Bool
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private var lastStaleCheck = Date.distantPast
 
     init(store: JSONStore? = AppModel.makeDefaultStore()) {
         var loaded = AppData.empty
@@ -55,6 +60,9 @@ final class AppModel {
         self.lastError = loadError
 
         notes.onError = { [weak self] in self?.lastError = $0 }
+        calendarExport.onError = { [weak self] in self?.lastError = $0 }
+        if loaded.preferences.exportSessionsToCalendar { calendarExport.connect() }
+        if loaded.preferences.staleGoalNotifications { StaleNotifier.requestPermission() }
         startTicker()
         observeSystemEvents()
     }
@@ -79,6 +87,12 @@ final class AppModel {
     }
 
     var dataFileURL: URL? { store?.url }
+
+    /// Where icons and covers of goals and areas are copied to.
+    var imagesFolder: URL {
+        (store?.url.deletingLastPathComponent() ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("Imagens", isDirectory: true)
+    }
 
     // MARK: - Reading
 
@@ -151,19 +165,33 @@ final class AppModel {
         let finished = data.running?.activityID == activityID
             ? engine.stop(at: date)
             : engine.start(activityID, at: date)
-        if let finished { data.sessions.append(finished) }
         data.running = engine.running
+        if let finished { appendSession(finished) }
         pauseNotice = nil
         persist()
+    }
+
+    /// Starts the activity; does nothing if it is already running.
+    func start(_ activityID: UUID) {
+        guard data.running?.activityID != activityID else { return }
+        toggle(activityID)
     }
 
     func stop(at date: Date = Date()) {
         var engine = TimerEngine(running: data.running)
         guard engine.isRunning else { return }
-        if let finished = engine.stop(at: date) { data.sessions.append(finished) }
+        let finished = engine.stop(at: date)
         data.running = engine.running
         now = Date()
+        if let finished { appendSession(finished) }
         persist()
+    }
+
+    /// Records a finished session, saving it before it goes to the calendar.
+    private func appendSession(_ session: FocusSession) {
+        data.sessions.append(session)
+        persist()
+        exportToCalendar(session.id, isNew: true)
     }
 
     private func startTicker() {
@@ -178,6 +206,10 @@ final class AppModel {
         now = Date()
         pauseIfIdle()
         agenda.refreshIfDue(urlString: data.preferences.calendarURL)
+        if now.timeIntervalSince(lastStaleCheck) >= 600 {
+            lastStaleCheck = now
+            notifyStalledGoals()
+        }
     }
 
     private func pauseIfIdle() {
@@ -186,7 +218,7 @@ final class AppModel {
         guard idle >= TimeInterval(data.preferences.idlePauseMinutes * 60) else { return }
         let lastInput = max(running.startedAt, now.addingTimeInterval(-idle))
         stop(at: lastInput)
-        let name = activity(running.activityID)?.name ?? "A atividade"
+        let name = activity(running.activityID)?.name ?? "A área"
         pauseNotice = "\(name) foi pausada por inatividade às \(lastInput.formatted(date: .omitted, time: .shortened))."
     }
 
@@ -210,9 +242,12 @@ final class AppModel {
 
     // MARK: - Activities
 
-    func addActivity(name: String, colorHex: String, goalID: UUID? = nil) {
-        data.activities.append(Activity(name: name, colorHex: colorHex, goalID: goalID))
+    @discardableResult
+    func addActivity(name: String, colorHex: String, goalID: UUID? = nil, icon: Icon? = nil, cover: String? = nil) -> Activity {
+        let activity = Activity(name: name, colorHex: colorHex, goalID: goalID, icon: icon, cover: cover)
+        data.activities.append(activity)
         persist()
+        return activity
     }
 
     func updateActivity(_ activity: Activity) {
@@ -244,6 +279,48 @@ final class AppModel {
             case (nil, nil): return lhs.title.localizedCompare(rhs.title) == .orderedAscending
             }
         }
+    }
+
+    var activeGoals: [Goal] { sortedGoals.filter { $0.status == .active } }
+
+    /// Paused and closed goals, kept out of the main lists.
+    var inactiveGoals: [Goal] { sortedGoals.filter { $0.status != .active } }
+
+    func updateGoal(_ goal: Goal) {
+        guard let index = data.goals.firstIndex(where: { $0.id == goal.id }) else { return }
+        data.goals[index] = goal
+        persist()
+    }
+
+    func setGoalStatus(_ id: UUID, _ status: GoalStatus) {
+        guard let index = data.goals.firstIndex(where: { $0.id == id }) else { return }
+        data.goals[index].status = status
+        persist()
+    }
+
+    /// "Fio da meada": every goal's state, in `data.goals` order.
+    var threads: [GoalThread] {
+        GoalThreads.compute(data: data, notes: notes.notes, now: now, calendar: calendar)
+    }
+
+    func thread(for goalID: UUID) -> GoalThread? {
+        threads.first { $0.goal.id == goalID }
+    }
+
+    /// This week's time on areas without a goal.
+    var looseAreasWeekTotal: TimeInterval {
+        let loose = Set(data.activities.filter { $0.goalID.map(goal) == nil }.map(\.id))
+        return Stats.total(spans, in: Stats.week(containing: now, calendar: calendar), activityIDs: loose)
+    }
+
+    func weekTotal(for activityID: UUID) -> TimeInterval {
+        Stats.total(spans, in: Stats.week(containing: now, calendar: calendar), activityIDs: [activityID])
+    }
+
+    /// Sends the daily notification about stalled goals, at most once a day.
+    private func notifyStalledGoals() {
+        guard data.preferences.staleGoalNotifications, let text = GoalThreads.notice(threads) else { return }
+        StaleNotifier.postOncePerDay(text, today: calendar.startOfDay(for: now))
     }
 
     /// Activities whose time counts toward the goal, archived ones included.
@@ -295,6 +372,25 @@ final class AppModel {
     func taskCounts(forGoal goalID: UUID) -> (done: Int, total: Int) {
         let linked = data.tasks.filter { $0.goalID == goalID }
         return (linked.filter(\.isDone).count, linked.count)
+    }
+
+    // MARK: - Links
+
+    /// Opens a `[[link]]`: a note, an objective or a task. A link to nothing creates the note, as in Obsidian.
+    func open(link target: String) {
+        if let node = NoteGraph.resolve(target, notes: notes.notes, goals: data.goals, tasks: data.tasks) {
+            open(node.ref)
+        } else if let note = notes.create(title: target) {
+            route = .note(note.url)
+        }
+    }
+
+    func open(_ ref: GraphNode.Ref) {
+        switch ref {
+        case .note(let url): route = .note(url)
+        case .goal(let id): route = .goal(id)
+        case .task: route = .tasks
+        }
     }
 
     // MARK: - Tasks
@@ -382,15 +478,38 @@ final class AppModel {
     /// Adds the session, or replaces the one with the same id.
     func saveSession(_ session: FocusSession) {
         if let index = data.sessions.firstIndex(where: { $0.id == session.id }) {
+            var session = session
+            session.calendarEventID = data.sessions[index].calendarEventID
             data.sessions[index] = session
+            persist()
+            exportToCalendar(session.id, isNew: false)
         } else {
-            data.sessions.append(session)
+            appendSession(session)
         }
-        persist()
     }
 
     func deleteSession(_ id: UUID) {
+        let removed = data.sessions.first { $0.id == id }
         data.sessions.removeAll { $0.id == id }
+        persist()
+        if data.preferences.exportSessionsToCalendar, let removed {
+            calendarExport.remove(removed)
+        }
+    }
+
+    /// Creates or updates the session's calendar event. Sessions from before the export was
+    /// turned on (no event yet) are left alone when edited.
+    private func exportToCalendar(_ sessionID: UUID, isNew: Bool) {
+        guard data.preferences.exportSessionsToCalendar,
+              let index = data.sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        let session = data.sessions[index]
+        guard isNew || session.calendarEventID != nil else { return }
+        let area = activity(session.activityID)
+        let event = SessionEvent.make(session, area: area, goal: area?.goalID.flatMap(goal))
+        guard let eventID = calendarExport.upsert(
+            event, sessionID: session.id, eventID: session.calendarEventID, calendarID: data.preferences.exportCalendarID
+        ), eventID != session.calendarEventID else { return }
+        data.sessions[index].calendarEventID = eventID
         persist()
     }
 
@@ -480,6 +599,23 @@ final class AppModel {
     }
 
     // MARK: - Preferences
+
+    func setExportSessions(_ on: Bool) {
+        data.preferences.exportSessionsToCalendar = on
+        persist()
+        if on { calendarExport.connect() }
+    }
+
+    func setExportCalendar(_ id: String) {
+        data.preferences.exportCalendarID = id
+        persist()
+    }
+
+    func setStaleGoalNotifications(_ on: Bool) {
+        data.preferences.staleGoalNotifications = on
+        persist()
+        if on { StaleNotifier.requestPermission() }
+    }
 
     func setDailyTarget(minutes: Int) {
         data.preferences.dailyTargetMinutes = max(0, minutes)
