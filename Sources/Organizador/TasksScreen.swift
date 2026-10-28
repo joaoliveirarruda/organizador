@@ -27,25 +27,28 @@ struct TasksScreen: View {
         let visible = tasks(for: filter)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeading(section: "Tarefas", title: filter.title)
-                PageSection(title: "Listas") {
-                    ForEach(TaskFilter.allCases) { list in
-                        Button { filter = list } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(list.title).foregroundStyle(Theme.text)
-                                    Text("›").foregroundStyle(Theme.secondaryText)
-                                }
-                                Text(listSubtitle(list)).font(Theme.font(size: 11)).foregroundStyle(Theme.secondaryText)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                ScreenHeading(section: "Tarefas", title: filter.title, subtitle: listSubtitle(filter)) {
+                    Picker("Lista", selection: $filter) {
+                        ForEach(TaskFilter.allCases) { Text($0.title).tag($0) }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                    Button("Nova tarefa") { creatingTask = true }
+                        .buttonStyle(.heading(primary: true))
+                        .keyboardShortcut("n")
                 }
-                PageSection(title: "Tarefas") {
+                PageSection(title: "") {
+                    if filter != .completed {
+                        HStack(spacing: 10) {
+                            Image(systemName: "plus").foregroundStyle(Theme.secondaryText).frame(width: 22)
+                            TextField("Adicionar tarefa (Enter)", text: $newTitle)
+                                .textFieldStyle(.plain)
+                                .onSubmit(addTask)
+                        }
+                        .padding(.vertical, 6)
+                        if !visible.isEmpty { Divider() }
+                    }
                     if visible.isEmpty {
                         Text(emptyTitle + " · " + emptyDescription).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
                     } else {
@@ -60,24 +63,6 @@ struct TasksScreen: View {
                                 .padding(.vertical, 6)
                         }
                     }
-                }
-                if filter != .completed {
-                    PageSection(title: "Adicionar rapidamente") {
-                        TextField("Digite e pressione Enter", text: $newTitle)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit(addTask)
-                    }
-                }
-                HStack(spacing: 8) {
-                    Button("Nova tarefa com detalhes") { creatingTask = true }
-                        .buttonStyle(AppActionButtonStyle(primary: true))
-                    Menu("Menu da tarefa") {
-                        ForEach(visible) { task in
-                            Button(task.title) { editingTask = task }
-                        }
-                    }
-                    .buttonStyle(AppActionButtonStyle())
-                    .disabled(visible.isEmpty)
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
