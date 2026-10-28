@@ -1,6 +1,6 @@
 # Organizador
 
-App nativo para macOS para organizar a vida: cronômetro por atividade, metas, tarefas, hábitos, agenda e finanças, num lugar só. O tempo que você cronometra em cada atividade vira progresso nas suas metas.
+App nativo para macOS para organizar a vida: cronômetro por atividade, metas, tarefas, hábitos, agenda, finanças e notas, num lugar só. O tempo que você cronometra em cada atividade vira progresso nas suas metas.
 
 Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquivo JSON legível.
 
@@ -46,6 +46,15 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Resumo do mês (receitas, despesas, saldo) e orçamento mensal por categoria, com aviso quando passa do limite.
 - Importação de extrato OFX ou CSV (formato brasileiro ou americano, inclusive o CSV da Nubank). Importar o mesmo arquivo de novo não duplica nada, e a categoria de um lançamento parecido é reaproveitada.
 
+**Notas:**
+
+- Editor Markdown que se formata enquanto você digita (títulos, negrito, itálico, código, citações, listas), com os símbolos apagados, como no Obsidian.
+- Digite `/` no começo da linha para inserir título, lista, checklist, citação, código ou divisória. Enter continua a lista; clique no `[ ]` para marcar.
+- `[[Nome]]` liga notas entre si e também a metas e tarefas. Clicar no link abre a nota (ou cria, se ainda não existir); embaixo aparece "Mencionada em" com as notas que apontam para esta.
+- Grafo de conexões: notas, metas e tarefas ligadas pelos links. Arraste nós, mova o fundo, use pinça para zoom e clique para abrir.
+- Exportar a nota em PDF (A4, com a formatação e sem os símbolos de Markdown).
+- Cada nota é um arquivo `.md` numa pasta que você escolhe nos Ajustes; dá para abrir a mesma pasta como cofre no Obsidian. Renomear uma nota atualiza os links nas outras.
+
 ## Como rodar
 
 Precisa de macOS 14 (Sonoma) ou mais novo e Xcode 16.
@@ -60,11 +69,11 @@ Testes: `swift test`.
 
 | Pasta | O que tem |
 | --- | --- |
-| `Sources/OrganizadorCore` | Regras sem interface: modelos, cronômetro, estatísticas, metas, tarefas, hábitos, agenda iCal, finanças, salvamento em JSON |
+| `Sources/OrganizadorCore` | Regras sem interface: modelos, cronômetro, estatísticas, metas, tarefas, hábitos, agenda iCal, finanças, notas e grafo, salvamento em JSON |
 | `Sources/Organizador` | O app SwiftUI: janela, barra de menu, ajustes |
 | `Tests/OrganizadorCoreTests` | Testes do núcleo |
 
-Os dados ficam em `~/Library/Application Support/Organizador/data.json`.
+Os dados ficam em `~/Library/Application Support/Organizador/data.json` e as notas, por padrão, em `~/Library/Application Support/Organizador/Notas/`.
 
 ## Licença
 
