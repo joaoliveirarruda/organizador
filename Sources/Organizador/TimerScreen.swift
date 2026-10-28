@@ -111,13 +111,7 @@ struct TimeTabs: View {
 
     var body: some View {
         @Bindable var model = model
-        Picker("Tempo", selection: $model.route) {
-            Text("Cronômetro").tag(Route.timer)
-            Text("Relatório").tag(Route.report)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
+        SegmentedTabs(options: [(Route.timer, "Cronômetro"), (Route.report, "Relatório")], selection: $model.route)
     }
 }
 

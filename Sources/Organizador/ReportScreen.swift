@@ -19,12 +19,7 @@ struct ReportScreen: View {
                         subtitle: report.interval.map { "\(label($0)) · \(DurationFormat.compact(total))" } ?? "Nenhum tempo registrado ainda"
                     )
                     Spacer()
-                    Picker("Período", selection: $period) {
-                        ForEach(ReportPeriod.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    SegmentedTabs(options: ReportPeriod.allCases.map { ($0, $0.rawValue) }, selection: $period)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {

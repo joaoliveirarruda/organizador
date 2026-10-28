@@ -48,12 +48,7 @@ struct NotesScreen: View {
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Picker("Modo", selection: $mode) {
-                    ForEach(Mode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                SegmentedTabs(options: Mode.allCases.map { ($0, $0.title) }, selection: $mode)
             }
         }
         .confirmationDialog("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in

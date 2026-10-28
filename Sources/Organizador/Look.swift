@@ -330,6 +330,35 @@ struct PeriodStepper: View {
     }
 }
 
+/// A choice between a few views, in the app's own look: same height, colors and corners as the heading buttons.
+struct SegmentedTabs<Value: Hashable>: View {
+    let options: [(value: Value, title: String)]
+    @Binding var selection: Value
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { index in
+                let option = options[index]
+                let selected = option.value == selection
+                Button { selection = option.value } label: {
+                    Text(option.title)
+                        .font(Theme.font(size: 13, weight: .medium))
+                        .foregroundStyle(selected ? Theme.text : Theme.secondaryText)
+                        .padding(.horizontal, 12)
+                        .frame(height: 26)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Theme.border : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
+        .accessibilityElement(children: .contain)
+    }
+}
+
 extension String {
     /// "Quarta-feira, 28 de outubro": only the first letter goes up, unlike `capitalized`.
     var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }

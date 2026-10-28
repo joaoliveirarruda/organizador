@@ -28,12 +28,7 @@ struct TasksScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeading(section: "Tarefas", title: filter.title, subtitle: listSubtitle(filter)) {
-                    Picker("Lista", selection: $filter) {
-                        ForEach(TaskFilter.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    SegmentedTabs(options: TaskFilter.allCases.map { ($0, $0.title) }, selection: $filter)
                     Button("Nova tarefa") { creatingTask = true }
                         .buttonStyle(.heading(primary: true))
                         .keyboardShortcut("n")
