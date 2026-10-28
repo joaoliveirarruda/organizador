@@ -2,7 +2,7 @@ import AppKit
 import OrganizadorCore
 import UniformTypeIdentifiers
 
-/// Saves a note as an A4 PDF with the Markdown rendered: no `#`, `**` or `[[ ]]`, bullets and boxes drawn.
+/// Saves a note as an A4 PDF with the Markdown rendered: no `#`, `**` or `[[ ]]`, bullets, boxes and tables drawn.
 @MainActor
 enum NotePDF {
     /// Asks where to save, then writes the PDF. Returns false when the user cancels.
@@ -47,14 +47,18 @@ enum NotePDF {
         let spans = MarkdownSpans.parse(note.body)
         MarkdownStyle.apply(spans, to: text, forPrint: true)
 
-        let edits: [(range: NSRange, text: String)] = spans.compactMap { span in
+        let edits: [(range: NSRange, text: NSAttributedString)] = spans.compactMap { span in
+            let plain = { (string: String) in
+                (span.range, NSAttributedString(string: string, attributes: text.attributes(at: span.range.location, effectiveRange: nil)))
+            }
             switch span.kind {
-            case .marker: return (span.range, "")
-            case .checkbox(let checked): return (span.range, checked ? "☑ " : "☐ ")
-            case .rule: return (span.range, String(repeating: "─", count: 28))
+            case .table: return (span.range, table(MarkdownTable.parse(text.attributedSubstring(from: span.range).string)))
+            case .marker: return plain("")
+            case .checkbox(let checked): return plain(checked ? "☑ " : "☐ ")
+            case .rule: return plain(String(repeating: "─", count: 28))
             case .listItem:
                 let marker = text.attributedSubstring(from: span.range).string
-                return "-*+".contains(marker.prefix(1)) ? (span.range, "• ") : nil
+                return "-*+".contains(marker.prefix(1)) ? plain("• ") : nil
             default: return nil
             }
         }
@@ -69,5 +73,28 @@ enum NotePDF {
         title.addAttribute(.font, value: NSFont.systemFont(ofSize: 30, weight: .bold), range: NSRange(location: 0, length: title.length))
         text.insert(title, at: 0)
         return text
+    }
+
+    /// Rows of cells as an `NSTextTable` with thin borders, header in bold.
+    private static func table(_ rows: [[String]]) -> NSAttributedString {
+        let table = NSTextTable()
+        table.numberOfColumns = rows.first?.count ?? 0
+        table.collapsesBorders = true
+        let result = NSMutableAttributedString()
+        for (row, cells) in rows.enumerated() {
+            for (column, cell) in cells.enumerated() {
+                let block = NSTextTableBlock(table: table, startingRow: row, rowSpan: 1, startingColumn: column, columnSpan: 1)
+                block.setWidth(0.5, type: .absoluteValueType, for: .border)
+                block.setBorderColor(.gray)
+                block.setWidth(4, type: .absoluteValueType, for: .padding)
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.textBlocks = [block]
+                var attributes = MarkdownStyle.baseAttributes
+                attributes[.paragraphStyle] = paragraph
+                if row == 0 { attributes[.font] = NSFont.systemFont(ofSize: MarkdownStyle.bodySize, weight: .semibold) }
+                result.append(NSAttributedString(string: cell + "\n", attributes: attributes))
+            }
+        }
+        return result
     }
 }

@@ -6,17 +6,20 @@ extension Note {
 }
 
 /// The YAML block at the top of a note (`---` ... `---`), as Obsidian writes it.
-/// Only `icon` and `cover` are understood; every other line is kept as it was.
+/// Only `icon`, `cover` and `pai` are understood; every other line is kept as it was.
 public struct FrontMatter: Hashable, Sendable {
     public var icon: Icon?
     /// Image path relative to the notes folder.
     public var cover: String?
+    /// Title of the page this one was created under, written as `pai: "[[Title]]"` so it is also a link.
+    public var parent: String?
     /// The block's lines as read, `icon:` and `cover:` included (they are rewritten on render).
     private var lines: [String] = []
 
-    public init(icon: Icon? = nil, cover: String? = nil) {
+    public init(icon: Icon? = nil, cover: String? = nil, parent: String? = nil) {
         self.icon = icon
         self.cover = cover
+        self.parent = parent
     }
 
     private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "bmp"]
@@ -42,6 +45,8 @@ public struct FrontMatter: Hashable, Sendable {
                 meta.icon = isImage ? .image(value) : .emoji(value)
             } else if let value = value(of: "cover", in: line), !value.isEmpty {
                 meta.cover = value
+            } else if let value = value(of: "pai", in: line) {
+                meta.parent = WikiLinks.targets(in: value).first
             }
         }
         return (meta, String(rest[closing.upperBound...]))
@@ -52,6 +57,7 @@ public struct FrontMatter: Hashable, Sendable {
         var output: [String] = []
         var wroteIcon = false
         var wroteCover = false
+        var wroteParent = false
         for line in lines {
             if Self.value(of: "icon", in: line) != nil {
                 if let icon, !wroteIcon { output.append("icon: \(Self.text(of: icon))") }
@@ -59,12 +65,16 @@ public struct FrontMatter: Hashable, Sendable {
             } else if Self.value(of: "cover", in: line) != nil {
                 if let cover, !wroteCover { output.append("cover: \(cover)") }
                 wroteCover = true
+            } else if Self.value(of: "pai", in: line) != nil {
+                if let parent, !wroteParent { output.append("pai: \"[[\(parent)]]\"") }
+                wroteParent = true
             } else {
                 output.append(line)
             }
         }
         if let icon, !wroteIcon { output.append("icon: \(Self.text(of: icon))") }
         if let cover, !wroteCover { output.append("cover: \(cover)") }
+        if let parent, !wroteParent { output.append("pai: \"[[\(parent)]]\"") }
         guard !output.isEmpty else { return body }
         return "---\n" + output.joined(separator: "\n") + "\n---\n" + body
     }

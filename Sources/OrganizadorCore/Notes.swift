@@ -163,7 +163,11 @@ public struct MarkdownSpan: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         /// The whole heading line, without its line break.
         case heading(Int)
-        case bold, italic, strikethrough, code, quote, rule
+        case bold, italic, strikethrough, code, quote, rule, highlight
+        /// `> [!tipo]` and the quote lines that follow it.
+        case callout
+        /// A whole `| a | b |` table, from the header to the last row, without the final line break.
+        case table
         /// The fenced block, fences included.
         case codeBlock
         /// The list marker (`- `, `1. `), without indentation.
@@ -188,8 +192,8 @@ public struct MarkdownSpan: Hashable, Sendable {
     }
 }
 
-/// A small line-based Markdown reader: headings, lists, checklists, quotes, code, rules,
-/// emphasis, links and wiki links. Not CommonMark; just what notes need.
+/// A small line-based Markdown reader: headings, lists, checklists, quotes, callouts, tables, code, rules,
+/// emphasis, highlights, links and wiki links. Not CommonMark; just what notes need.
 public enum MarkdownSpans {
     private static func regex(_ pattern: String) -> NSRegularExpression {
         try! NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
@@ -199,27 +203,39 @@ public enum MarkdownSpans {
     private static let heading = regex(#"^(#{1,6})[ \t]+"#)
     private static let rule = regex(#"^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$"#)
     private static let quote = regex(#"^>[ \t]?"#)
+    private static let callout = regex(#"^>[ \t]?\[![^\]\n]+\][-+]?[ \t]?"#)
+    private static let tableRow = regex(#"^[ \t]*\|"#)
+    private static let tableSeparator = regex(#"^[ \t]*\|[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$"#)
     private static let checkbox = regex(#"^[ \t]*([-*+] \[( |x|X)\] )"#)
     private static let listItem = regex(#"^[ \t]*([-*+]|\d+[.)]) "#)
     private static let inlineCode = regex(#"`([^`\n]+)`"#)
     private static let bold = regex(#"(\*\*|__)(?=\S)(.+?)(?<=\S)\1"#)
     private static let italic = regex(#"(?<![*\w])\*(?![\s*])(.+?)(?<![\s*])\*(?!\*)|(?<![_\w])_(?![\s_])(.+?)(?<![\s_])_(?!\w)"#)
     private static let strike = regex(#"~~(?=\S)(.+?)(?<=\S)~~"#)
+    private static let highlight = regex(#"==(?=\S)(.+?)(?<=\S)=="#)
     private static let link = regex(#"(?<![!\[])\[([^\[\]\n]+)\]\(([^)\s]+)\)"#)
 
     public static func parse(_ text: String) -> [MarkdownSpan] {
         let string = text as NSString
-        var spans: [MarkdownSpan] = []
-        var fenceStart: Int?
+        var lines: [(line: NSRange, withBreak: NSRange)] = []
         var location = 0
-
         while location < string.length {
-            let lineWithBreak = string.lineRange(for: NSRange(location: location, length: 0))
-            var line = lineWithBreak
+            let withBreak = string.lineRange(for: NSRange(location: location, length: 0))
+            var line = withBreak
             while line.length > 0, [10, 13].contains(string.character(at: NSMaxRange(line) - 1)) {
                 line.length -= 1
             }
-            location = NSMaxRange(lineWithBreak)
+            lines.append((line, withBreak))
+            location = NSMaxRange(withBreak)
+        }
+
+        var spans: [MarkdownSpan] = []
+        var fenceStart: Int?
+        var inCallout = false
+        var index = 0
+        while index < lines.count {
+            let (line, lineWithBreak) = lines[index]
+            index += 1
 
             if fence.firstMatch(in: text, range: line) != nil {
                 spans.append(MarkdownSpan(.marker, lineWithBreak))
@@ -232,7 +248,26 @@ public enum MarkdownSpans {
                 continue
             }
             if fenceStart != nil { continue }
-            spans += parseLine(text, line: line)
+
+            // A table needs a `|---|` line right under its header.
+            if tableRow.firstMatch(in: text, range: line) != nil, index < lines.count,
+               tableSeparator.firstMatch(in: text, range: lines[index].line) != nil {
+                var end = index + 1
+                while end < lines.count, tableRow.firstMatch(in: text, range: lines[end].line) != nil { end += 1 }
+                let last = lines[end - 1].line
+                spans.append(MarkdownSpan(.table, NSRange(location: line.location, length: NSMaxRange(last) - line.location)))
+                index = end
+                inCallout = false
+                continue
+            }
+
+            var lineSpans = parseLine(text, line: line)
+            // Quote lines right after a callout belong to it, as in Obsidian.
+            if inCallout, let quote = lineSpans.firstIndex(where: { $0.kind == .quote }) {
+                lineSpans[quote].kind = .callout
+            }
+            inCallout = lineSpans.contains { $0.kind == .callout }
+            spans += lineSpans
         }
         if let start = fenceStart {
             spans.append(MarkdownSpan(.codeBlock, NSRange(location: start, length: string.length - start)))
@@ -249,6 +284,10 @@ public enum MarkdownSpans {
         }
         if let match = heading.firstMatch(in: text, range: line) {
             spans.append(MarkdownSpan(.heading(match.range(at: 1).length), line))
+            spans.append(MarkdownSpan(.marker, match.range))
+            content = NSRange(location: NSMaxRange(match.range), length: NSMaxRange(line) - NSMaxRange(match.range))
+        } else if let match = callout.firstMatch(in: text, range: line) {
+            spans.append(MarkdownSpan(.callout, line))
             spans.append(MarkdownSpan(.marker, match.range))
             content = NSRange(location: NSMaxRange(match.range), length: NSMaxRange(line) - NSMaxRange(match.range))
         } else if let match = quote.firstMatch(in: text, range: line) {
@@ -294,7 +333,7 @@ public enum MarkdownSpans {
             spans.append(MarkdownSpan(.marker, NSRange(location: tail, length: NSMaxRange(match.range) - tail)))
             taken.append(match.range)
         }
-        for (expression, kind, width) in [(bold, MarkdownSpan.Kind.bold, 2), (strike, .strikethrough, 2), (italic, .italic, 1)] {
+        for (expression, kind, width) in [(bold, MarkdownSpan.Kind.bold, 2), (strike, .strikethrough, 2), (highlight, .highlight, 2), (italic, .italic, 1)] {
             for match in expression.matches(in: text, range: content) where isFree(match.range) {
                 spans.append(MarkdownSpan(kind, match.range))
                 spans += edgeMarkers(match.range, open: width, close: width)
@@ -309,6 +348,64 @@ public enum MarkdownSpans {
             MarkdownSpan(.marker, NSRange(location: range.location, length: open)),
             MarkdownSpan(.marker, NSRange(location: NSMaxRange(range) - close, length: close)),
         ]
+    }
+}
+
+/// A Markdown pipe table as rows of cells, header first.
+public enum MarkdownTable {
+    /// The cells of each row, without the `|---|` line. Short rows are padded so every row has the same width.
+    public static func parse(_ text: String) -> [[String]] {
+        let lines = text.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var rows = lines.enumerated().filter { $0.offset != 1 }.map { cells(in: $0.element) }
+        let width = rows.map(\.count).max() ?? 0
+        for index in rows.indices {
+            rows[index] += Array(repeating: "", count: width - rows[index].count)
+        }
+        return rows
+    }
+
+    /// The table as Markdown with its columns lined up. `|` inside a cell is escaped.
+    public static func render(_ rows: [[String]]) -> String {
+        guard let header = rows.first, !header.isEmpty else { return "" }
+        let rows = rows.map { row in
+            header.indices.map { index in
+                (index < row.count ? row[index] : "")
+                    .replacingOccurrences(of: "\n", with: " ")
+                    .replacingOccurrences(of: "|", with: "\\|")
+            }
+        }
+        let widths = header.indices.map { column in max(3, rows.map { $0[column].count }.max() ?? 0) }
+        func line(_ cells: [String]) -> String {
+            "| " + cells.enumerated().map { $1.padding(toLength: widths[$0], withPad: " ", startingAt: 0) }
+                .joined(separator: " | ") + " |"
+        }
+        let separator = line(widths.map { String(repeating: "-", count: $0) })
+        return ([line(rows[0]), separator] + rows.dropFirst().map(line)).joined(separator: "\n")
+    }
+
+    private static func cells(in line: String) -> [String] {
+        var text = line.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("|") { text.removeFirst() }
+        if text.hasSuffix("|"), !text.hasSuffix("\\|") { text.removeLast() }
+        var cells: [String] = []
+        var cell = ""
+        var escaped = false
+        for character in text {
+            if escaped {
+                cell.append(character == "|" ? "|" : "\\\(character)")
+                escaped = false
+            } else if character == "\\" {
+                escaped = true
+            } else if character == "|" {
+                cells.append(cell.trimmingCharacters(in: .whitespaces))
+                cell = ""
+            } else {
+                cell.append(character)
+            }
+        }
+        if escaped { cell.append("\\") }
+        cells.append(cell.trimmingCharacters(in: .whitespaces))
+        return cells
     }
 }
 
