@@ -672,3 +672,48 @@ final class NotesTests: XCTestCase {
         XCTAssertLessThan(layout.step(edges: edges), 1)
     }
 }
+
+final class SchemaV2Tests: XCTestCase {
+    func testVersion1FileOpensWithNewDefaults() throws {
+        let goalID = UUID()
+        let json = """
+        {"schemaVersion":1,
+         "goals":[{"id":"\(goalID)","title":"CS229","startDate":"2026-10-01T00:00:00Z"}],
+         "activities":[{"id":"\(UUID())","name":"Aulas","colorHex":"#2D98DA","goalID":"\(goalID)","isArchived":false,"createdAt":"2026-10-01T00:00:00Z"}],
+         "sessions":[{"id":"\(UUID())","activityID":"\(UUID())","start":"2026-10-01T10:00:00Z","end":"2026-10-01T11:00:00Z"}],
+         "preferences":{"dailyTargetMinutes":120}}
+        """
+        let data = try JSONStore.makeDecoder().decode(AppData.self, from: Data(json.utf8))
+        XCTAssertEqual(data.schemaVersion, 2)
+        let goal = try XCTUnwrap(data.goals.first)
+        XCTAssertEqual(goal.status, .active)
+        XCTAssertEqual(goal.staleDays, 7)
+        XCTAssertNil(goal.weeklyHours)
+        XCTAssertNil(goal.icon)
+        XCTAssertNil(goal.cover)
+        XCTAssertNil(data.activities.first?.icon)
+        XCTAssertNil(data.sessions.first?.calendarEventID)
+        XCTAssertFalse(data.preferences.exportSessionsToCalendar)
+        XCTAssertEqual(data.preferences.exportCalendarID, "")
+        XCTAssertTrue(data.preferences.staleGoalNotifications)
+    }
+
+    func testRoundTripWithNewFields() throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let goal = Goal(
+            title: "OAB", startDate: start, icon: .emoji("⚖️"), cover: "capa.jpg",
+            weeklyHours: 6, staleDays: 3, status: .paused
+        )
+        let area = Activity(name: "Penal", colorHex: "#FF6B6B", goalID: goal.id, createdAt: start, icon: .image("penal.png"), cover: "p.jpg")
+        var session = FocusSession(activityID: area.id, start: start, end: start.addingTimeInterval(600))
+        session.calendarEventID = "EV-1"
+        var preferences = Preferences()
+        preferences.exportSessionsToCalendar = true
+        preferences.exportCalendarID = "CAL"
+        preferences.staleGoalNotifications = false
+        let data = AppData(activities: [area], goals: [goal], sessions: [session], preferences: preferences)
+
+        let encoded = try JSONStore.makeEncoder().encode(data)
+        XCTAssertEqual(try JSONStore.makeDecoder().decode(AppData.self, from: encoded), data)
+    }
+}
