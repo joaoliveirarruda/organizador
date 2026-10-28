@@ -886,3 +886,23 @@ final class GoalThreadsTests: XCTestCase {
         XCTAssertEqual(GoalThreads.notice(threads), "3 frentes paradas: Inglês (18 dias), CS229 (9 dias) e OAB (7 dias).")
     }
 }
+
+final class SessionEventTests: XCTestCase {
+    let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func testTitleWithGoal() {
+        let goal = Goal(title: "Passar na OAB")
+        let area = Activity(name: "Penal", colorHex: "#000000", goalID: goal.id)
+        let session = FocusSession(activityID: area.id, start: start, end: start.addingTimeInterval(5400))
+        let event = SessionEvent.make(session, area: area, goal: goal)
+        XCTAssertEqual(event.title, "⏱ Penal · Passar na OAB")
+        XCTAssertEqual(event.start, start)
+        XCTAssertEqual(event.end, start.addingTimeInterval(5400))
+    }
+
+    func testTitleWithoutGoal() {
+        let area = Activity(name: "E-mails", colorHex: "#000000")
+        let session = FocusSession(activityID: area.id, start: start, end: start.addingTimeInterval(60))
+        XCTAssertEqual(SessionEvent.make(session, area: area, goal: nil).title, "⏱ E-mails")
+    }
+}
