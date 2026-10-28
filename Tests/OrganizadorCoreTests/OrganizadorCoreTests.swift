@@ -214,6 +214,8 @@ final class DurationFormatTests: XCTestCase {
         XCTAssertEqual(DurationFormat.short(15 * 60), "15min")
         XCTAssertEqual(DurationFormat.short(3 * 3600), "3h")
         XCTAssertEqual(DurationFormat.short(3 * 3600 + 15 * 60 + 59), "3h 15min")
+        XCTAssertEqual(DurationFormat.short(0), "0min")
+        XCTAssertEqual(DurationFormat.short(30), "<1min")
     }
 }
 
