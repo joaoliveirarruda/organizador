@@ -329,12 +329,15 @@ struct ActivityEditor: View {
     @State private var name: String
     @State private var colorHex: String
     @State private var goalID: UUID?
+    @State private var areaID: UUID?
+    @State private var addingArea = false
 
     init(activity: Activity?, goalID: UUID? = nil) {
         self.activity = activity
         _name = State(initialValue: activity?.name ?? "")
         _colorHex = State(initialValue: activity?.colorHex ?? Palette.colors[3])
         _goalID = State(initialValue: activity?.goalID ?? goalID)
+        _areaID = State(initialValue: activity?.areaID)
     }
 
     var body: some View {
@@ -350,6 +353,15 @@ struct ActivityEditor: View {
                         .overlay(Circle().stroke(Color.primary, lineWidth: hex == colorHex ? 2 : 0))
                         .onTapGesture { colorHex = hex }
                 }
+            }
+            HStack {
+                Picker("Área", selection: $areaID) {
+                    Text("Sem área").tag(UUID?.none)
+                    ForEach(model.areas) { area in
+                        Text(area.name).tag(Optional(area.id))
+                    }
+                }
+                Button("Nova área…") { addingArea = true }
             }
             Picker("Conta para o objetivo", selection: $goalID) {
                 Text("Nenhum (área solta)").tag(UUID?.none)
@@ -368,6 +380,9 @@ struct ActivityEditor: View {
         }
         .padding(20)
         .frame(width: 380)
+        .sheet(isPresented: $addingArea) {
+            AreaEditor(area: nil) { areaID = $0.id }
+        }
     }
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -377,9 +392,10 @@ struct ActivityEditor: View {
             activity.name = trimmedName
             activity.colorHex = colorHex
             activity.goalID = goalID
+            activity.areaID = areaID
             model.updateActivity(activity)
         } else {
-            model.addActivity(name: trimmedName, colorHex: colorHex, goalID: goalID)
+            model.addActivity(name: trimmedName, colorHex: colorHex, goalID: goalID, areaID: areaID)
         }
         dismiss()
     }
