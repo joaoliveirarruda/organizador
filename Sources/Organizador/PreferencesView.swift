@@ -53,6 +53,27 @@ struct PreferencesView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Notas") {
+                LabeledContent("Pasta") {
+                    HStack {
+                        Text(model.notes.folder.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                        Button("Escolher…", action: chooseNotesFolder)
+                        Button("Mostrar no Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([model.notes.folder])
+                        }
+                    }
+                }
+                if !preferences.notesFolderPath.isEmpty {
+                    Button("Voltar para a pasta padrão") { model.setNotesFolder(nil) }
+                }
+                Text("Cada nota é um arquivo .md. Você pode abrir a mesma pasta como cofre no Obsidian.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if let url = model.dataFileURL {
                 Section {
                     LabeledContent("Seus dados") {
@@ -67,5 +88,16 @@ struct PreferencesView: View {
         .frame(width: 520)
         .padding()
         .onAppear { calendarLink = model.data.preferences.calendarURL }
+    }
+
+    private func chooseNotesFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Usar esta pasta"
+        if panel.runModal() == .OK, let url = panel.url {
+            model.setNotesFolder(url)
+        }
     }
 }

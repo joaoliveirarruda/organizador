@@ -35,13 +35,6 @@ public struct NoteStore: Sendable {
         self.folder = folder
     }
 
-    /// `~/Library/Application Support/Organizador/Notas` on macOS.
-    public static func defaultFolder(appName: String = "Organizador") throws -> URL {
-        try JSONStore.defaultURL(appName: appName)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Notas", isDirectory: true)
-    }
-
     /// Every note in the folder, most recently changed first. Hidden folders like `.obsidian` are skipped.
     public func list() throws -> [Note] {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

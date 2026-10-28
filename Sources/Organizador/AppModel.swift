@@ -17,6 +17,8 @@ final class AppModel {
     let calendar = Calendar.current
     /// Meetings from the user's calendar link.
     let agenda: CalendarFeed
+    /// The notes folder.
+    let notes: NotesLibrary
     private let store: JSONStore?
     /// False when the data file could not be read, so we never overwrite it with empty data.
     private let canSave: Bool
@@ -44,12 +46,22 @@ final class AppModel {
         self.agenda = CalendarFeed(
             cacheURL: store?.url.deletingLastPathComponent().appendingPathComponent("calendar.ics")
         )
+        let notesPath = loaded.preferences.notesFolderPath
+        self.notes = NotesLibrary(folder: notesPath.isEmpty
+            ? Self.defaultNotesFolder(next: store)
+            : URL(fileURLWithPath: notesPath, isDirectory: true))
         self.canSave = loadError == nil
         self.data = loaded
         self.lastError = loadError
 
+        notes.onError = { [weak self] in self?.lastError = $0 }
         startTicker()
         observeSystemEvents()
+    }
+
+    private static func defaultNotesFolder(next store: JSONStore?) -> URL {
+        (store?.url.deletingLastPathComponent() ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("Notas", isDirectory: true)
     }
 
     nonisolated static func makeDefaultStore() -> JSONStore? {
@@ -477,6 +489,13 @@ final class AppModel {
     func setIdlePause(minutes: Int) {
         data.preferences.idlePauseMinutes = max(0, minutes)
         persist()
+    }
+
+    /// Points the notes at another folder, or back at the default one when `url` is nil.
+    func setNotesFolder(_ url: URL?) {
+        data.preferences.notesFolderPath = url?.path ?? ""
+        persist()
+        notes.setFolder(url ?? Self.defaultNotesFolder(next: store))
     }
 
     private func persist() {
