@@ -21,15 +21,29 @@ struct FinanceScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 ScreenHeading(
                     section: "Finanças",
-                    title: "Finanças",
-                    subtitle: "\(month.start.formatted(.dateTime.month(.wide).year()).capitalized) · receitas \(Finance.format(cents: summary.incomeCents)) · despesas \(Finance.format(cents: summary.expenseCents)) · saldo \(Finance.format(cents: summary.balanceCents))"
-                )
-                BudgetSection(summary: summary)
+                    title: month.start.formatted(.dateTime.month(.wide).year()).capitalized
+                ) {
+                    PeriodStepper(currentTitle: "Este mês", isCurrent: month.contains(Date()), step: shiftMonth) { monthStart = Date() }
+                    Button("Importar extrato") { choosingFile = true }.buttonStyle(.heading())
+                    Button("Novo lançamento") { addingTransaction = true }
+                        .buttonStyle(.heading(primary: true))
+                        .keyboardShortcut("n")
+                }
+                HStack(spacing: 12) {
+                    MoneyTile(title: "Receitas", cents: summary.incomeCents)
+                    MoneyTile(title: "Despesas", cents: summary.expenseCents)
+                    MoneyTile(title: "Saldo", cents: summary.balanceCents, highlightNegative: true)
+                }
+                BudgetSection(summary: summary) { editingCategories = true }
 
                 PageSection(title: "Lançamentos") {
                     if transactions.isEmpty {
-                        Text("Nenhum lançamento neste mês. Adicione um ou importe o extrato do banco.")
+                        Text("Nenhum lançamento neste mês.")
                             .font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+                        HStack(spacing: 8) {
+                            Button("Adicionar lançamento") { addingTransaction = true }.buttonStyle(.heading(primary: true))
+                            Button("Importar extrato do banco") { choosingFile = true }.buttonStyle(.heading())
+                        }
                     }
                     ForEach(transactions) { transaction in
                         TransactionRow(transaction: transaction)
@@ -41,13 +55,6 @@ struct FinanceScreen: View {
                             }
                             .padding(.vertical, 5)
                     }
-                }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
-                    Button("Mês anterior") { shiftMonth(-1) }.buttonStyle(AppActionButtonStyle())
-                    Button("Próximo mês") { shiftMonth(1) }.buttonStyle(AppActionButtonStyle())
-                    Button("Novo lançamento") { addingTransaction = true }.buttonStyle(AppActionButtonStyle(primary: true))
-                    Button("Importar extrato") { choosingFile = true }.buttonStyle(AppActionButtonStyle())
-                    Button("Categorias e orçamento") { editingCategories = true }.buttonStyle(AppActionButtonStyle())
                 }
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
@@ -113,10 +120,31 @@ struct FinanceScreen: View {
     }
 }
 
+/// One number of the month, big enough to read at a glance.
+private struct MoneyTile: View {
+    let title: String
+    let cents: Int
+    var highlightNegative = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
+            Text(Finance.format(cents: cents))
+                .font(Theme.font(size: 22, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(highlightNegative && cents < 0 ? Color.red : Theme.text)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+    }
+}
+
 /// Spending per expense category against its monthly budget.
 private struct BudgetSection: View {
     @Environment(AppModel.self) private var model
     let summary: MonthSummary
+    let editCategories: () -> Void
 
     var body: some View {
         let rows = model.data.financeCategories
@@ -142,6 +170,8 @@ private struct BudgetSection: View {
                     BudgetRow(name: "Sem categoria", colorHex: "#778CA3", spent: uncategorized, budget: nil)
                 }
             }
+        } accessory: {
+            Button("Categorias e orçamento") { editCategories() }.buttonStyle(.heading())
         }
     }
 }
