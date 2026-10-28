@@ -158,9 +158,11 @@ struct TaskRow: View {
                     .help("Prioridade alta")
             }
             if let due = task.dueDate {
-                Text(due.formatted(.dateTime.day().month(.abbreviated)))
+                let overdue = model.isOverdue(task)
+                // Said in words too, not by the red alone.
+                Text((overdue ? "atrasada · " : "") + due.formatted(.dateTime.day().month(.abbreviated)))
                     .font(.callout)
-                    .foregroundStyle(model.isOverdue(task) ? Color.red : Color.secondary)
+                    .foregroundStyle(overdue ? Color.red : Color.secondary)
             }
         }
         .padding(.vertical, 2)
