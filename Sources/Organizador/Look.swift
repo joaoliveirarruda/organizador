@@ -70,14 +70,25 @@ struct IconView: View {
                 .frame(width: size, height: size)
         case .image(let path):
             if let image = ImageFiles.image(path, in: base) {
-                Image(nsImage: image).resizable().scaledToFill()
+                Image(nsImage: thumbnail(image))
                     .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: size * 0.2))
             } else {
                 symbol
             }
         case nil:
             symbol
+        }
+    }
+
+    /// The photo already cropped and rounded at icon size. Menu labels (the page header) draw
+    /// an NSImage at its own size and ignore SwiftUI frames, so the picture must be small itself.
+    private func thumbnail(_ image: NSImage) -> NSImage {
+        NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            NSBezierPath(roundedRect: rect, xRadius: size * 0.2, yRadius: size * 0.2).addClip()
+            let scale = max(rect.width / image.size.width, rect.height / image.size.height)
+            let width = image.size.width * scale, height = image.size.height * scale
+            image.draw(in: NSRect(x: (rect.width - width) / 2, y: (rect.height - height) / 2, width: width, height: height))
+            return true
         }
     }
 
