@@ -36,8 +36,7 @@ struct AreaPage: View {
                         Button(isRunning ? "Pausar" : "Começar", systemImage: isRunning ? "pause.fill" : "play.fill") {
                             model.toggle(area.id)
                         }
-                        .buttonStyle(AppActionButtonStyle(primary: true))
-                        .tint(Color(hex: area.colorHex))
+                        .buttonStyle(.heading(primary: true))
                         if let goal {
                             Button { model.route = .goal(goal.id) } label: {
                                 Label(goal.title, systemImage: "flag")
@@ -47,7 +46,7 @@ struct AreaPage: View {
                             Text("Atividade solta").foregroundStyle(Theme.secondaryText)
                         }
                         Spacer()
-                        Button("Editar") { editing = true }
+                        Button("Editar") { editing = true }.buttonStyle(.heading())
                     }
 
                     PageSection(title: "Resumo") {

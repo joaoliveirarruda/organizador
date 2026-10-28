@@ -126,10 +126,9 @@ struct PageHeader<Title: View>: View {
                     .overlay(alignment: .bottomTrailing) {
                         if hovering {
                             HStack {
-                                Button("Trocar capa") { pickCover() }
-                                Button("Remover") { setCover(nil) }
+                                Button("Trocar capa") { pickCover() }.buttonStyle(.heading())
+                                Button("Remover") { setCover(nil) }.buttonStyle(.heading())
                             }
-                            .controlSize(.small)
                             .padding(10)
                         }
                     }
