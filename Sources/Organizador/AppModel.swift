@@ -189,8 +189,8 @@ final class AppModel {
 
     // MARK: - Activities
 
-    func addActivity(name: String, colorHex: String) {
-        data.activities.append(Activity(name: name, colorHex: colorHex))
+    func addActivity(name: String, colorHex: String, goalID: UUID? = nil) {
+        data.activities.append(Activity(name: name, colorHex: colorHex, goalID: goalID))
         persist()
     }
 
@@ -204,6 +204,66 @@ final class AppModel {
         if data.running?.activityID == id { stop() }
         guard let index = data.activities.firstIndex(where: { $0.id == id }) else { return }
         data.activities[index].isArchived = true
+        persist()
+    }
+
+    // MARK: - Goals
+
+    func goal(_ id: UUID) -> Goal? {
+        data.goals.first { $0.id == id }
+    }
+
+    /// Goals with the nearest deadline first; goals without a deadline last.
+    var sortedGoals: [Goal] {
+        data.goals.sorted { lhs, rhs in
+            switch (lhs.deadline, rhs.deadline) {
+            case let (l?, r?): return l < r
+            case (.some, nil): return true
+            case (nil, .some): return false
+            case (nil, nil): return lhs.title.localizedCompare(rhs.title) == .orderedAscending
+            }
+        }
+    }
+
+    /// Activities whose time counts toward the goal, archived ones included.
+    func activities(forGoal goalID: UUID) -> [Activity] {
+        data.activities.filter { $0.goalID == goalID }
+    }
+
+    func progress(for goal: Goal) -> GoalProgress {
+        GoalProgress.compute(for: goal, activities: data.activities, spans: spans, now: now)
+    }
+
+    /// Time logged this calendar week on the goal's activities.
+    func thisWeekTotal(for goal: Goal) -> TimeInterval {
+        let ids = Set(activities(forGoal: goal.id).map(\.id))
+        return Stats.total(spans, in: Stats.week(containing: now, calendar: calendar), activityIDs: ids)
+    }
+
+    /// Adds or replaces the goal and makes exactly `activityIDs` count toward it.
+    /// An activity can feed one goal only, so selecting it here moves it from any other goal.
+    func saveGoal(_ goal: Goal, activityIDs: Set<UUID>) {
+        if let index = data.goals.firstIndex(where: { $0.id == goal.id }) {
+            data.goals[index] = goal
+        } else {
+            data.goals.append(goal)
+        }
+        for index in data.activities.indices {
+            if activityIDs.contains(data.activities[index].id) {
+                data.activities[index].goalID = goal.id
+            } else if data.activities[index].goalID == goal.id {
+                data.activities[index].goalID = nil
+            }
+        }
+        persist()
+    }
+
+    /// Deletes the goal. Its activities and their sessions are kept.
+    func deleteGoal(_ id: UUID) {
+        data.goals.removeAll { $0.id == id }
+        for index in data.activities.indices where data.activities[index].goalID == id {
+            data.activities[index].goalID = nil
+        }
         persist()
     }
 

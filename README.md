@@ -16,9 +16,15 @@ Open source, feito em Swift (SwiftUI). Os dados ficam só no seu Mac, num arquiv
 - Histórico por dia, com edição e inclusão manual de sessões.
 - Estatísticas de 7 e 30 dias por atividade.
 
+**Metas:**
+
+- Meta com alvo em horas, prazo e data de início.
+- Você escolhe quais atividades contam para cada meta; o tempo cronometrado nelas vira progresso.
+- Barra de progresso, ritmo semanal necessário para chegar no prazo e quanto você fez nesta semana.
+
 ## Próximos passos
 
-1. Metas (com alvo em horas e ritmo semanal), tarefas e hábitos.
+1. Tarefas e hábitos.
 2. Agenda do Google pelo link iCal secreto, e a tela "Hoje".
 3. Finanças: lançamentos, categorias, orçamento e importação de extrato.
 
