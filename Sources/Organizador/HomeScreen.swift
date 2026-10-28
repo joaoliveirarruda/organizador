@@ -180,7 +180,7 @@ private struct StalledCard: View {
         let goal = thread.goal
         HStack(spacing: 10) {
             IconView(icon: goal.icon, base: model.imagesFolder, fallback: "flag", size: 20)
-            Button("\(goal.title) · parado há \(thread.idleDays) dias") { model.route = .goal(goal.id) }
+            Button("\(goal.title) · parado há \(GoalThreads.days(thread.idleDays))") { model.route = .goal(goal.id) }
                 .buttonStyle(.plain)
                 .fontWeight(.medium)
             Spacer()

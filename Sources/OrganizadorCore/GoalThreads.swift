@@ -75,7 +75,8 @@ public enum GoalThreads {
         return "\(stalled.count) frentes paradas: \(list)."
     }
 
-    private static func days(_ count: Int) -> String {
+    /// "1 dia", "9 dias".
+    public static func days(_ count: Int) -> String {
         count == 1 ? "1 dia" : "\(count) dias"
     }
 }

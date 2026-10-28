@@ -59,7 +59,7 @@ struct SearchScreen: View {
         if !notes.isEmpty {
             PageSection(title: "Notas") {
                 ForEach(notes) { note in
-                    row(note.title, icon: IconView(icon: FrontMatter.parse(note.body).0.icon, base: model.notes.folder)) {
+                    row(note.title, icon: IconView(icon: note.icon, base: model.notes.folder)) {
                         model.route = .note(note.url)
                     }
                 }

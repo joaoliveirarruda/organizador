@@ -60,7 +60,7 @@ struct NotesScreen: View {
                 .padding(8)
             List(filteredNotes, selection: $library.selectedURL) { note in
                 HStack(spacing: 8) {
-                    IconView(icon: FrontMatter.parse(note.body).0.icon, base: library.folder, size: 16)
+                    IconView(icon: note.icon, base: library.folder, size: 16)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(note.title).lineLimit(1)
                         Text(note.modifiedAt, format: .dateTime.day().month().hour().minute())

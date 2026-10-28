@@ -109,8 +109,8 @@ private struct Sidebar: View {
                 }
 
                 header("Recentes") { EmptyView() }
-                ForEach(model.notes.notes.prefix(6)) { note in
-                    SidebarRow(title: note.title, icon: FrontMatter.parse(note.body).0.icon, base: model.notes.folder, route: .note(note.url))
+                ForEach(model.notes.notes.sorted { $0.modifiedAt > $1.modifiedAt }.prefix(6)) { note in
+                    SidebarRow(title: note.title, icon: note.icon, base: model.notes.folder, route: .note(note.url))
                 }
 
                 header("Mais") { EmptyView() }

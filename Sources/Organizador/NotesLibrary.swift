@@ -121,6 +121,15 @@ final class NotesLibrary {
         }
     }
 
+    /// Points `[[old]]` links at `new` in every note, e.g. after an objective is renamed.
+    func rewriteLinks(from old: String, to new: String) {
+        for note in notes {
+            let body = WikiLinks.rewrite(note.body, from: old, to: new)
+            if body != note.body { setBody(body, of: note.url) }
+        }
+        saveNow()
+    }
+
     func trash(_ note: Note) {
         unsaved.remove(note.url)
         do {

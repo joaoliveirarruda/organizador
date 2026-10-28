@@ -107,7 +107,11 @@ struct PreferencesView: View {
         .formStyle(.grouped)
         .frame(width: 520)
         .padding()
-        .onAppear { calendarLink = model.data.preferences.calendarURL }
+        .onAppear {
+            calendarLink = model.data.preferences.calendarURL
+            // Picks up access granted in System Settings meanwhile.
+            if model.data.preferences.exportSessionsToCalendar { model.calendarExport.connect() }
+        }
     }
 
     private func chooseNotesFolder() {

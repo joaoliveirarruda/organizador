@@ -36,7 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         StaleNotifier.setDelegate(self)
-        StaleNotifier.requestPermission()
+    }
+
+    /// Show the notice even when the app is in front.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter, willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 
     /// Clicking the stalled-goals notification opens Home.

@@ -78,6 +78,9 @@ struct TitleField: View {
             return
         }
         model.notes.rename(note, to: title)
+        if model.route == .note(note.url), let renamed = model.notes.selectedURL {
+            model.route = .note(renamed)
+        }
         draft = model.notes.selected?.title ?? note.title
     }
 }

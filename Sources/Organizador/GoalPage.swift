@@ -160,7 +160,7 @@ struct GoalPage: View {
             ForEach(linked) { note in
                 Button { model.route = .note(note.url) } label: {
                     HStack(spacing: 8) {
-                        IconView(icon: FrontMatter.parse(note.body).0.icon, base: model.notes.folder, size: 16)
+                        IconView(icon: note.icon, base: model.notes.folder, size: 16)
                         Text(note.title)
                         Spacer()
                         Text(note.modifiedAt.formatted(.relative(presentation: .named))).foregroundStyle(Theme.secondaryText)
@@ -302,7 +302,7 @@ struct GoalEditor: View {
                     if hasWeekly {
                         TextField("Horas por semana", value: $weeklyHours, format: .number)
                     }
-                    Stepper("Parado após \(staleDays == 1 ? "1 dia" : "\(staleDays) dias") sem mexer", value: $staleDays, in: 1...90)
+                    Stepper("Parado após \(GoalThreads.days(staleDays)) sem mexer", value: $staleDays, in: 1...90)
                 }
 
                 Section("Áreas que contam para este objetivo") {
@@ -387,6 +387,10 @@ struct GoalEditor: View {
         saved.deadline = hasDeadline ? endOfDeadlineDay : nil
         saved.weeklyHours = hasWeekly ? weeklyHours : nil
         saved.staleDays = staleDays
+        if let old = goal?.title, old != trimmedTitle {
+            // Notes belong to the goal through [[title]], so they follow the rename.
+            model.notes.rewriteLinks(from: old, to: trimmedTitle)
+        }
         model.saveGoal(saved, activityIDs: activityIDs)
         if goal == nil { model.route = .goal(saved.id) }
         dismiss()

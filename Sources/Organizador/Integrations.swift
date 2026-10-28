@@ -64,9 +64,15 @@ final class CalendarExporter {
         }
     }
 
-    func remove(sessionID: UUID, eventID: String?) {
-        guard access == .granted, let event = eventID.flatMap(store.event(withIdentifier:)) else { return }
-        try? store.remove(event, span: .thisEvent, commit: true)
+    func remove(_ session: FocusSession) {
+        guard access == .granted,
+              let event = session.calendarEventID.flatMap(store.event(withIdentifier:))
+                ?? find(session.id, around: session.start, session.end) else { return }
+        do {
+            try store.remove(event, span: .thisEvent, commit: true)
+        } catch {
+            onError("Não foi possível apagar o evento do Calendário: \(error.localizedDescription)")
+        }
     }
 
     private func find(_ sessionID: UUID, around start: Date, _ end: Date) -> EKEvent? {
@@ -103,11 +109,17 @@ enum StaleNotifier {
         guard isAvailable else { return }
         let key = "lastStaleNoticeDay"
         guard UserDefaults.standard.object(forKey: key) as? Date != today else { return }
-        UserDefaults.standard.set(today, forKey: key)
-        let content = UNMutableNotificationContent()
-        content.title = "Frentes paradas"
-        content.body = text
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "stale-goals", content: content, trigger: nil))
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Frentes paradas"
+            content.body = text
+            center.add(UNNotificationRequest(identifier: "stale-goals", content: content, trigger: nil)) { error in
+                // Only a delivered notice uses up the day.
+                if error == nil { UserDefaults.standard.set(today, forKey: key) }
+            }
+        }
     }
 
     static func setDelegate(_ delegate: UNUserNotificationCenterDelegate) {

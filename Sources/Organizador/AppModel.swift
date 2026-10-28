@@ -62,6 +62,7 @@ final class AppModel {
         notes.onError = { [weak self] in self?.lastError = $0 }
         calendarExport.onError = { [weak self] in self?.lastError = $0 }
         if loaded.preferences.exportSessionsToCalendar { calendarExport.connect() }
+        if loaded.preferences.staleGoalNotifications { StaleNotifier.requestPermission() }
         startTicker()
         observeSystemEvents()
     }
@@ -488,11 +489,11 @@ final class AppModel {
     }
 
     func deleteSession(_ id: UUID) {
-        let eventID = data.sessions.first { $0.id == id }?.calendarEventID
+        let removed = data.sessions.first { $0.id == id }
         data.sessions.removeAll { $0.id == id }
         persist()
-        if data.preferences.exportSessionsToCalendar {
-            calendarExport.remove(sessionID: id, eventID: eventID)
+        if data.preferences.exportSessionsToCalendar, let removed {
+            calendarExport.remove(removed)
         }
     }
 

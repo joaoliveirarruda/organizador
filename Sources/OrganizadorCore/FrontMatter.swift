@@ -1,5 +1,10 @@
 import Foundation
 
+extension Note {
+    /// The icon from the note's front matter.
+    public var icon: Icon? { FrontMatter.parse(body).0.icon }
+}
+
 /// The YAML block at the top of a note (`---` ... `---`), as Obsidian writes it.
 /// Only `icon` and `cover` are understood; every other line is kept as it was.
 public struct FrontMatter: Hashable, Sendable {
