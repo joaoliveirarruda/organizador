@@ -6,6 +6,7 @@ import SwiftUI
 struct NotePage: View {
     @Environment(AppModel.self) private var model
     let note: Note
+    @State private var confirmingTrash = false
 
     private var library: NotesLibrary { model.notes }
 
@@ -38,8 +39,15 @@ struct NotePage: View {
                 Button("Mostrar no Finder", systemImage: "folder") {
                     NSWorkspace.shared.activateFileViewerSelecting([note.url])
                 }
+                Button("Mover para o Lixo", systemImage: "trash") { confirmingTrash = true }
             }
         }
+        .confirmationDialog("Mover nota para o Lixo?", isPresented: $confirmingTrash, titleVisibility: .visible) {
+            Button("Mover para o Lixo", role: .destructive) {
+                library.trash(current)
+                model.route = .notes
+            }
+        } message: { Text("A nota será removida.") }
     }
 
     /// The note as it is now in the library (the view's copy may be a keystroke behind).

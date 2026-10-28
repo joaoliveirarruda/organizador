@@ -47,6 +47,9 @@ struct NotesScreen: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
+                        }
                     }
                 }
                 PageSection(title: mode == .editor ? "Editor" : "Grafo") {
