@@ -906,3 +906,112 @@ final class SessionEventTests: XCTestCase {
         XCTAssertEqual(SessionEvent.make(session, area: area, goal: nil).title, "⏱ E-mails")
     }
 }
+
+final class AreaModelTests: XCTestCase {
+    func testOldFileWithoutAreasStillLoads() throws {
+        let json = ##"{"schemaVersion":2,"activities":[{"id":"\##(UUID().uuidString)","name":"CS229","colorHex":"#2D98DA","isArchived":false,"createdAt":0}]}"##
+        let data = try JSONDecoder().decode(AppData.self, from: Data(json.utf8))
+        XCTAssertEqual(data.areas, [])
+        XCTAssertNil(data.activities.first?.areaID)
+    }
+
+    func testAreaAndActivityLinkRoundTrip() throws {
+        let area = Area(name: "Universidade", colorHex: "#2D98DA")
+        let original = AppData(activities: [Activity(name: "CS229", colorHex: "#2D98DA", areaID: area.id)], areas: [area])
+        let decoded = try JSONDecoder().decode(AppData.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(decoded.areas, [area])
+        XCTAssertEqual(decoded.activities.first?.areaID, area.id)
+    }
+}
+
+final class TimeReportTests: XCTestCase {
+    var calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        calendar.firstWeekday = 2
+        return calendar
+    }()
+    // A Monday, 00:00 UTC.
+    let monday = Date(timeIntervalSince1970: 1_793_577_600)
+    let hour: TimeInterval = 3600
+
+    func span(_ activity: Activity, from start: TimeInterval, hours: Double) -> TimeSpan {
+        let begin = monday.addingTimeInterval(start * hour)
+        return TimeSpan(activityID: activity.id, start: begin, end: begin.addingTimeInterval(hours * hour))
+    }
+
+    var week: DateInterval { Stats.week(containing: monday.addingTimeInterval(3 * 86_400), calendar: calendar) }
+
+    func testCompactFormat() {
+        XCTAssertEqual(DurationFormat.compact(18 * 3600 + 40 * 60), "18h40")
+        XCTAssertEqual(DurationFormat.compact(6 * 3600), "6h")
+        XCTAssertEqual(DurationFormat.compact(30 * 60), "30min")
+        XCTAssertEqual(DurationFormat.compact(3600 + 5 * 60), "1h05")
+    }
+
+    func testGroupsByAreaLargestFirst() {
+        let uni = Area(name: "Universidade", colorHex: "#2D98DA")
+        let work = Area(name: "Trabalho", colorHex: "#8854D0")
+        let cs = Activity(name: "CS229", colorHex: "#2D98DA", areaID: uni.id)
+        let calc = Activity(name: "Cálculo", colorHex: "#2D98DA", areaID: uni.id)
+        let project = Activity(name: "Projeto", colorHex: "#8854D0", areaID: work.id)
+        let spans = [span(cs, from: 9, hours: 2), span(calc, from: 12, hours: 1), span(project, from: 30, hours: 4)]
+        let report = TimeReport.build(spans: spans, activities: [cs, calc, project], areas: [uni, work], in: week)
+        XCTAssertEqual(report.map(\.area?.name), ["Trabalho", "Universidade"])
+        XCTAssertEqual(report.map(\.seconds), [4 * hour, 3 * hour])
+        XCTAssertEqual(report[1].activities.map(\.activity.name), ["CS229", "Cálculo"])
+        XCTAssertEqual(report[1].activities.map(\.seconds), [2 * hour, hour])
+    }
+
+    func testActivityWithoutOrMissingAreaGoesToSemArea() {
+        let loose = Activity(name: "E-mails", colorHex: "#FF6B6B")
+        let orphan = Activity(name: "Velha", colorHex: "#FF6B6B", areaID: UUID())
+        let report = TimeReport.build(
+            spans: [span(loose, from: 9, hours: 1), span(orphan, from: 11, hours: 2)],
+            activities: [loose, orphan], areas: [], in: week
+        )
+        XCTAssertEqual(report.count, 1)
+        XCTAssertNil(report[0].area)
+        XCTAssertEqual(report[0].seconds, 3 * hour)
+        XCTAssertEqual(report[0].activities.map(\.activity.name), ["Velha", "E-mails"])
+    }
+
+    func testArchivedActivityStillCounts() {
+        let area = Area(name: "Pessoal", colorHex: "#F7B731")
+        let gym = Activity(name: "Academia", colorHex: "#F7B731", areaID: area.id, isArchived: true)
+        let report = TimeReport.build(spans: [span(gym, from: 7, hours: 1)], activities: [gym], areas: [area], in: week)
+        XCTAssertEqual(report.first?.seconds, hour)
+    }
+
+    func testSpanCrossingPeriodStartCountsOnlyInside() {
+        let area = Area(name: "Pessoal", colorHex: "#F7B731")
+        let reading = Activity(name: "Leitura", colorHex: "#F7B731", areaID: area.id)
+        // Sunday 23:00 → Monday 01:00.
+        let report = TimeReport.build(spans: [span(reading, from: -1, hours: 2)], activities: [reading], areas: [area], in: week)
+        XCTAssertEqual(report.first?.seconds, hour)
+    }
+
+    func testEmptyIntervalReturnsEmpty() {
+        let area = Area(name: "Pessoal", colorHex: "#F7B731")
+        let reading = Activity(name: "Leitura", colorHex: "#F7B731", areaID: area.id)
+        let report = TimeReport.build(spans: [span(reading, from: -30, hours: 2)], activities: [reading], areas: [area], in: week)
+        XCTAssertEqual(report, [])
+    }
+
+    func testTotalIntervalIsNilWithoutSpans() {
+        XCTAssertNil(TimeReport.interval(.total, spans: [], now: monday, calendar: calendar))
+    }
+
+    func testTotalIntervalStartsAtEarliestSpan() {
+        let reading = Activity(name: "Leitura", colorHex: "#F7B731")
+        let now = monday.addingTimeInterval(100 * hour)
+        let spans = [span(reading, from: 50, hours: 1), span(reading, from: -200, hours: 1)]
+        let interval = TimeReport.interval(.total, spans: spans, now: now, calendar: calendar)
+        XCTAssertEqual(interval, DateInterval(start: monday.addingTimeInterval(-200 * hour), end: now))
+    }
+
+    func testWeekIntervalStartsMonday() {
+        let interval = TimeReport.interval(.week, spans: [], now: monday.addingTimeInterval(40 * hour), calendar: calendar)
+        XCTAssertEqual(interval?.start, monday)
+    }
+}

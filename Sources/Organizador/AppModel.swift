@@ -218,7 +218,7 @@ final class AppModel {
         guard idle >= TimeInterval(data.preferences.idlePauseMinutes * 60) else { return }
         let lastInput = max(running.startedAt, now.addingTimeInterval(-idle))
         stop(at: lastInput)
-        let name = activity(running.activityID)?.name ?? "A área"
+        let name = activity(running.activityID)?.name ?? "A atividade"
         pauseNotice = "\(name) foi pausada por inatividade às \(lastInput.formatted(date: .omitted, time: .shortened))."
     }
 
@@ -243,8 +243,8 @@ final class AppModel {
     // MARK: - Activities
 
     @discardableResult
-    func addActivity(name: String, colorHex: String, goalID: UUID? = nil, icon: Icon? = nil, cover: String? = nil) -> Activity {
-        let activity = Activity(name: name, colorHex: colorHex, goalID: goalID, icon: icon, cover: cover)
+    func addActivity(name: String, colorHex: String, goalID: UUID? = nil, areaID: UUID? = nil, icon: Icon? = nil, cover: String? = nil) -> Activity {
+        let activity = Activity(name: name, colorHex: colorHex, goalID: goalID, areaID: areaID, icon: icon, cover: cover)
         data.activities.append(activity)
         persist()
         return activity
@@ -261,6 +261,45 @@ final class AppModel {
         guard let index = data.activities.firstIndex(where: { $0.id == id }) else { return }
         data.activities[index].isArchived = true
         persist()
+    }
+
+    // MARK: - Areas
+
+    var areas: [Area] {
+        data.areas.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    func area(_ id: UUID?) -> Area? {
+        guard let id else { return nil }
+        return data.areas.first { $0.id == id }
+    }
+
+    @discardableResult
+    func addArea(name: String, colorHex: String) -> Area {
+        let area = Area(name: name, colorHex: colorHex)
+        data.areas.append(area)
+        persist()
+        return area
+    }
+
+    func updateArea(_ area: Area) {
+        guard let index = data.areas.firstIndex(where: { $0.id == area.id }) else { return }
+        data.areas[index] = area
+        persist()
+    }
+
+    /// Its activities lose the area; their sessions stay as they are.
+    func deleteArea(_ id: UUID) {
+        data.areas.removeAll { $0.id == id }
+        for index in data.activities.indices where data.activities[index].areaID == id {
+            data.activities[index].areaID = nil
+        }
+        persist()
+    }
+
+    func report(_ period: ReportPeriod) -> (interval: DateInterval?, areas: [TimeReport.AreaTotal]) {
+        guard let interval = TimeReport.interval(period, spans: spans, now: now, calendar: calendar) else { return (nil, []) }
+        return (interval, TimeReport.build(spans: spans, activities: data.activities, areas: data.areas, in: interval))
     }
 
     // MARK: - Goals

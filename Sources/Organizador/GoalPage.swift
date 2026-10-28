@@ -66,7 +66,7 @@ struct GoalPage: View {
                 Button("Trabalhar neste objetivo") { model.start(areas[0].id) }
                     .buttonStyle(AppActionButtonStyle(primary: true))
             } else if areas.isEmpty {
-                Button("Criar área para cronometrar", systemImage: "plus") { addingArea = true }
+                Button("Criar atividade para cronometrar", systemImage: "plus") { addingArea = true }
             } else {
                 Menu {
                     ForEach(areas) { area in
@@ -133,7 +133,7 @@ struct GoalPage: View {
             VStack(alignment: .leading, spacing: 6) {
                 if let session = thread.lastSession {
                     Label(
-                        "\(model.activity(session.activityID)?.name ?? "Área") · \(session.end.formatted(.relative(presentation: .named))) · \(DurationFormat.short(session.duration))",
+                        "\(model.activity(session.activityID)?.name ?? "Atividade") · \(session.end.formatted(.relative(presentation: .named))) · \(DurationFormat.short(session.duration))",
                         systemImage: "timer"
                     )
                 }
@@ -211,9 +211,9 @@ struct GoalPage: View {
     }
 
     private func areaList(_ areas: [Activity]) -> some View {
-        PageSection(title: "Áreas") {
+        PageSection(title: "Atividades") {
             if areas.isEmpty {
-                Text("Nenhuma área ligada. O tempo das áreas ligadas vira progresso.").foregroundStyle(Theme.secondaryText)
+                Text("Nenhuma atividade ligada. O tempo das atividades ligadas vira progresso.").foregroundStyle(Theme.secondaryText)
             }
             ForEach(areas) { area in
                 Button { model.route = .area(area.id) } label: {
@@ -230,7 +230,7 @@ struct GoalPage: View {
                 .buttonStyle(.plain)
             }
         } accessory: {
-            Button("Nova área", systemImage: "plus") { addingArea = true }
+            Button("Nova atividade", systemImage: "plus") { addingArea = true }
                 .buttonStyle(.borderless)
         }
     }
@@ -309,9 +309,9 @@ struct GoalEditor: View {
                     Stepper("Parado após \(GoalThreads.days(staleDays)) sem mexer", value: $staleDays, in: 1...90)
                 }
 
-                Section("Áreas que contam para este objetivo") {
+                Section("Atividades que contam para este objetivo") {
                     if model.activeActivities.isEmpty {
-                        Text("Crie áreas no Cronômetro primeiro.")
+                        Text("Crie atividades no Cronômetro primeiro.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(model.activeActivities) { activity in

@@ -26,13 +26,30 @@ public enum Icon: Codable, Hashable, Sendable {
     }
 }
 
-/// An area (`Activity`) in the UI: something you spend time on, like "Estudar inglês". Sessions are logged against an activity.
+/// A big area (`Area`) in the UI, e.g. "Universidade", grouping activities.
+public struct Area: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var colorHex: String
+    public var createdAt: Date
+
+    public init(id: UUID = UUID(), name: String, colorHex: String, createdAt: Date = Date()) {
+        self.id = id
+        self.name = name
+        self.colorHex = colorHex
+        self.createdAt = createdAt
+    }
+}
+
+/// An activity (`Activity`) in the UI: something you spend time on, like "CS229". Sessions are logged against an activity.
 public struct Activity: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var name: String
     public var colorHex: String
     /// The goal this activity's time counts toward, if any.
     public var goalID: UUID?
+    /// The area this activity belongs to, if any.
+    public var areaID: UUID?
     public var isArchived: Bool
     public var createdAt: Date
     public var icon: Icon?
@@ -44,6 +61,7 @@ public struct Activity: Identifiable, Codable, Hashable, Sendable {
         name: String,
         colorHex: String,
         goalID: UUID? = nil,
+        areaID: UUID? = nil,
         isArchived: Bool = false,
         createdAt: Date = Date(),
         icon: Icon? = nil,
@@ -53,6 +71,7 @@ public struct Activity: Identifiable, Codable, Hashable, Sendable {
         self.name = name
         self.colorHex = colorHex
         self.goalID = goalID
+        self.areaID = areaID
         self.isArchived = isArchived
         self.createdAt = createdAt
         self.icon = icon
@@ -227,6 +246,7 @@ public struct AppData: Codable, Hashable, Sendable {
 
     public var schemaVersion: Int
     public var activities: [Activity]
+    public var areas: [Area]
     public var goals: [Goal]
     public var sessions: [FocusSession]
     public var tasks: [TaskItem]
@@ -240,6 +260,7 @@ public struct AppData: Codable, Hashable, Sendable {
     public init(
         schemaVersion: Int = AppData.currentSchemaVersion,
         activities: [Activity] = [],
+        areas: [Area] = [],
         goals: [Goal] = [],
         sessions: [FocusSession] = [],
         tasks: [TaskItem] = [],
@@ -252,6 +273,7 @@ public struct AppData: Codable, Hashable, Sendable {
     ) {
         self.schemaVersion = schemaVersion
         self.activities = activities
+        self.areas = areas
         self.goals = goals
         self.sessions = sessions
         self.tasks = tasks
@@ -266,7 +288,7 @@ public struct AppData: Codable, Hashable, Sendable {
     public static let empty = AppData()
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, activities, goals, sessions, tasks, habits, habitChecks
+        case schemaVersion, activities, areas, goals, sessions, tasks, habits, habitChecks
         case financeCategories, transactions, running, preferences
     }
 
@@ -281,6 +303,7 @@ public struct AppData: Codable, Hashable, Sendable {
                 AppData.currentSchemaVersion
             ),
             activities: try container.decodeIfPresent([Activity].self, forKey: .activities) ?? [],
+            areas: try container.decodeIfPresent([Area].self, forKey: .areas) ?? [],
             goals: try container.decodeIfPresent([Goal].self, forKey: .goals) ?? [],
             sessions: try container.decodeIfPresent([FocusSession].self, forKey: .sessions) ?? [],
             tasks: try container.decodeIfPresent([TaskItem].self, forKey: .tasks) ?? [],

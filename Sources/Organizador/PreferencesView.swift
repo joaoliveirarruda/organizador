@@ -41,6 +41,10 @@ struct PreferencesView: View {
     @ViewBuilder
     private func settingsForm(_ preferences: Preferences) -> some View {
         Form {
+            if selectedSection == "Áreas" {
+                AreaSettings()
+            }
+
             if selectedSection == "Cronômetro" {
             Section("Cronômetro") {
                 Stepper(
@@ -98,7 +102,7 @@ struct PreferencesView: View {
                 if preferences.exportSessionsToCalendar {
                     CalendarExportStatus()
                 }
-                Text("O evento leva a área, o objetivo e o horário de início e fim. Com sua conta Google adicionada em Ajustes do Sistema › Contas de Internet, ele aparece também no Google Agenda. Sessões antigas não são exportadas.")
+                Text("O evento leva a atividade, o objetivo e o horário de início e fim. Com sua conta Google adicionada em Ajustes do Sistema › Contas de Internet, ele aparece também no Google Agenda. Sessões antigas não são exportadas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -151,6 +155,7 @@ struct PreferencesView: View {
 
     private var settingsRows: some View {
         let rows = [
+            ("Áreas", "Grupos de atividades, como Universidade ou Trabalho"),
             ("Cronômetro", "Meta diária e pausa automática"),
             ("Receber compromissos", "Agenda por endereço iCal"),
             ("Enviar sessões ao Calendário", "Permissão e calendário de destino"),
@@ -173,6 +178,7 @@ struct PreferencesView: View {
 
     private func settingsSubtitle(_ section: String) -> String {
         switch section {
+        case "Áreas": "Agrupe atividades para ver o tempo de cada parte da vida."
         case "Cronômetro": "Meta diária e pausa automática."
         case "Receber compromissos": "Conecte uma agenda por endereço iCal."
         case "Enviar sessões ao Calendário": "Escolha como registrar sessões no Calendário."
