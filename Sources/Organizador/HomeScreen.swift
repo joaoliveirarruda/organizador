@@ -86,12 +86,12 @@ struct HomeScreen: View {
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
-        .sheet(item: $editingTask) { TaskEditor(task: $0) }
-        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
-        .sheet(item: $editingSession) { SessionEditor(session: $0) }
-        .sheet(isPresented: $addingHabit) { HabitEditor(habit: nil) }
-        .confirmationDialog("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
+        .floatingSheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
+        .floatingSheet(item: $editingTask) { TaskEditor(task: $0) }
+        .floatingSheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+        .floatingSheet(item: $editingSession) { SessionEditor(session: $0) }
+        .floatingSheet(isPresented: $addingHabit) { HabitEditor(habit: nil) }
+        .appConfirm("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
             Button("Excluir tarefa", role: .destructive) { model.deleteTask(task.id); deletingTask = nil }
         } message: { _ in Text("A tarefa será removida.") }
     }
@@ -147,7 +147,7 @@ struct HomeScreen: View {
                 TaskRow(task: task)
                     .contentShape(Rectangle())
                     .onTapGesture { editingTask = task }
-                    .contextMenu {
+                    .appContextMenu {
                         Button("Editar") { editingTask = task }
                         Button("Excluir", role: .destructive) { deletingTask = task }
                     }
@@ -277,7 +277,7 @@ struct StartBox: View {
         .padding(20)
         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border.opacity(0.5)))
-        .sheet(isPresented: $showingNewActivity) { ActivityEditor(activity: nil) }
+        .floatingSheet(isPresented: $showingNewActivity) { ActivityEditor(activity: nil) }
     }
 
 }

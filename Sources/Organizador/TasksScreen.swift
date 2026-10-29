@@ -51,7 +51,7 @@ struct TasksScreen: View {
                             TaskRow(task: task)
                                 .contentShape(Rectangle())
                                 .onTapGesture { editingTask = task }
-                                .contextMenu {
+                                .appContextMenu {
                                     Button("Editar") { editingTask = task }
                                     Button("Excluir", role: .destructive) { deletingTask = task }
                                 }
@@ -63,11 +63,11 @@ struct TasksScreen: View {
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(item: $editingTask) { task in
+        .floatingSheet(item: $editingTask) { task in
             TaskEditor(task: task)
         }
-        .sheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
-        .confirmationDialog("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
+        .floatingSheet(isPresented: $creatingTask) { TaskEditor(task: nil) }
+        .appConfirm("Excluir tarefa?", isPresented: Binding(get: { deletingTask != nil }, set: { if !$0 { deletingTask = nil } }), titleVisibility: .visible, presenting: deletingTask) { task in
             Button("Excluir tarefa", role: .destructive) { model.deleteTask(task.id); deletingTask = nil }
         } message: { _ in Text("A tarefa será removida.") }
     }
@@ -165,7 +165,7 @@ struct TaskRow: View {
 
 struct TaskEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let task: TaskItem?
     @State private var title: String
     @State private var notes: String
@@ -187,26 +187,21 @@ struct TaskEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(task == nil ? "Nova tarefa" : "Editar tarefa").font(.headline)
-            Form {
+            Text(task == nil ? "Nova tarefa" : "Editar tarefa").font(Theme.font(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
                 TextField("Título", text: $title)
                 TextField("Notas", text: $notes, axis: .vertical)
                     .lineLimit(3...6)
                 Toggle("Prazo", isOn: $hasDueDate)
                 if hasDueDate {
-                    DatePicker("Dia", selection: $dueDate, displayedComponents: .date)
+                    DateField("Dia", selection: $dueDate, displayedComponents: .date)
                 }
-                Picker("Prioridade", selection: $priority) {
-                    Text("Baixa").tag(TaskPriority.low)
-                    Text("Normal").tag(TaskPriority.normal)
-                    Text("Alta").tag(TaskPriority.high)
-                }
-                Picker("Objetivo", selection: $goalID) {
-                    Text("Nenhuma").tag(UUID?.none)
-                    ForEach(model.sortedGoals) { goal in
-                        Text(goal.title).tag(Optional(goal.id))
-                    }
-                }
+                ChoicePicker("Prioridade", selection: $priority, choices: [
+                    Choice(value: .low, title: "Baixa"), Choice(value: .normal, title: "Normal"), Choice(value: .high, title: "Alta"),
+                ])
+                ChoicePicker("Objetivo", selection: $goalID, choices: [Choice(value: nil, title: "Nenhum")] + model.sortedGoals.map {
+                    Choice(value: Optional($0.id), title: $0.title)
+                })
             }
             HStack {
                 if task != nil {
@@ -219,12 +214,13 @@ struct TaskEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(trimmedTitle.isEmpty)
             }
         }
         .padding(20)
         .frame(width: 440)
-        .confirmationDialog("Excluir tarefa?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .appConfirm("Excluir tarefa?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             if let task {
                 Button("Excluir tarefa", role: .destructive) {
                     model.deleteTask(task.id)

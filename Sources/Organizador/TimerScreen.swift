@@ -47,14 +47,14 @@ struct TimerScreen: View {
             .pageColumn()
         }
         .toolbar { ToolbarItem(placement: .principal) { TimeTabs() } }
-        .sheet(isPresented: $showingNewActivity) {
+        .floatingSheet(isPresented: $showingNewActivity) {
             ActivityEditor(activity: nil)
         }
-        .sheet(item: $editingActivity) { activity in
+        .floatingSheet(item: $editingActivity) { activity in
             ActivityEditor(activity: activity)
         }
-        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
-        .confirmationDialog(
+        .floatingSheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+        .appConfirm(
             "Arquivar atividade?",
             isPresented: Binding(get: { archivingActivity != nil }, set: { if !$0 { archivingActivity = nil } }),
             titleVisibility: .visible,
@@ -76,7 +76,7 @@ struct TimerScreen: View {
         }
         ForEach(model.activeActivities) { area in
             AreaTimerRow(area: area)
-                .contextMenu {
+                .appContextMenu {
                     Button("Abrir") { model.route = .area(area.id) }
                     Button("Editar") { editingActivity = area }
                     Button("Arquivar", role: .destructive) { archivingActivity = area }
@@ -240,8 +240,8 @@ struct DayCalendar: View {
             }
         }
         .background(Theme.sidebar)
-        .sheet(item: $editingSession) { SessionEditor(session: $0) }
-        .sheet(isPresented: $addingSession) { SessionEditor(session: nil) }
+        .floatingSheet(item: $editingSession) { SessionEditor(session: $0) }
+        .floatingSheet(isPresented: $addingSession) { SessionEditor(session: nil) }
     }
 
     /// Meetings go in the left column, timed work in the right one.
@@ -294,7 +294,7 @@ struct ActivityToggleRow: View {
 
 struct ActivityEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let activity: Activity?
     @State private var name: String
     @State private var colorHex: String
@@ -312,45 +312,39 @@ struct ActivityEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(activity == nil ? "Nova atividade" : "Editar atividade").font(.headline)
+            Text(activity == nil ? "Nova atividade" : "Editar atividade").font(Theme.font(size: 16, weight: .semibold))
             TextField("Nome", text: $name)
-                .textFieldStyle(.roundedBorder)
             HStack(spacing: 8) {
                 ForEach(Palette.colors, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
                         .frame(width: 24, height: 24)
-                        .overlay(Circle().stroke(Color.primary, lineWidth: hex == colorHex ? 2 : 0))
+                        .overlay(Circle().stroke(Theme.text, lineWidth: hex == colorHex ? 2 : 0))
                         .onTapGesture { colorHex = hex }
                 }
             }
             HStack {
-                Picker("Área", selection: $areaID) {
-                    Text("Sem área").tag(UUID?.none)
-                    ForEach(model.areas) { area in
-                        Text(area.name).tag(Optional(area.id))
-                    }
-                }
+                ChoicePicker("Área", selection: $areaID, choices: [Choice(value: nil, title: "Sem área")] + model.areas.map {
+                    Choice(value: Optional($0.id), title: $0.name, color: Color(hex: $0.colorHex))
+                })
                 Button("Nova área…") { addingArea = true }
             }
-            Picker("Conta para o objetivo", selection: $goalID) {
-                Text("Nenhum (atividade solta)").tag(UUID?.none)
-                ForEach(model.activeGoals) { goal in
-                    Text(goal.title).tag(Optional(goal.id))
-                }
-            }
+            ChoicePicker("Conta para o objetivo", selection: $goalID, choices: [Choice(value: nil, title: "Nenhum (atividade solta)")] + model.activeGoals.map {
+                Choice(value: Optional($0.id), title: $0.title)
+            })
             HStack {
                 Spacer()
                 Button("Cancelar", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(trimmedName.isEmpty)
             }
         }
         .padding(20)
         .frame(width: 380)
-        .sheet(isPresented: $addingArea) {
+        .floatingSheet(isPresented: $addingArea) {
             AreaEditor(area: nil) { areaID = $0.id }
         }
     }

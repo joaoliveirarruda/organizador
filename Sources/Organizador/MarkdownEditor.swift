@@ -153,6 +153,8 @@ struct MarkdownEditor: NSViewRepresentable {
         private var tables: [NSHostingView<TableGrid>] = []
         private var tableRanges: [NSRange] = []
         private var lastSelection = NSRange(location: 0, length: 0)
+        /// The open `/` list, while it is on screen.
+        private var slashMenu: SlashMenu?
 
         init(_ parent: MarkdownEditor) {
             self.parent = parent
@@ -239,6 +241,7 @@ struct MarkdownEditor: NSViewRepresentable {
             guard let textView else { return }
             restyle()
             parent.onChange(textView.string)
+            updateSlashQuery()
         }
 
         func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
@@ -262,7 +265,27 @@ struct MarkdownEditor: NSViewRepresentable {
         }
 
         func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            selector == #selector(NSResponder.insertNewline(_:)) ? continueList() : false
+            if let menu = openSlashMenu {
+                switch selector {
+                case #selector(NSResponder.moveDown(_:)):
+                    menu.move(1)
+                    return true
+                case #selector(NSResponder.moveUp(_:)):
+                    menu.move(-1)
+                    return true
+                case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertTab(_:)):
+                    if menu.items.indices.contains(menu.selected) { pick(menu.items[menu.selected]) }
+                    return true
+                case #selector(NSResponder.cancelOperation(_:)):
+                    closeSlashMenu()
+                    return true
+                case #selector(NSResponder.moveLeft(_:)), #selector(NSResponder.moveRight(_:)):
+                    closeSlashMenu()
+                default:
+                    break
+                }
+            }
+            return selector == #selector(NSResponder.insertNewline(_:)) ? continueList() : false
         }
 
         // MARK: Editing helpers
@@ -331,68 +354,175 @@ struct MarkdownEditor: NSViewRepresentable {
             ("Tabela", "tablecells", MarkdownTable.render([["Coluna 1", "Coluna 2"], ["", ""]]) + "\n"),
         ]
 
-        /// A menu item that runs a closure.
-        private final class MenuAction: NSObject {
-            let run: () -> Void
-            init(_ run: @escaping () -> Void) { self.run = run }
-            @objc func fire() { run() }
+        /// The `/` list, if it is still the list on screen (Esc or a click elsewhere closes it from outside).
+        private var openSlashMenu: SlashMenu? {
+            guard let menu = slashMenu, Overlays.shared.popup?.id == menu.popupID else { return nil }
+            return menu
         }
 
-        private func item(_ title: String, symbol: String?, run: @escaping () -> Void) -> NSMenuItem {
-            let action = MenuAction(run)
-            let item = NSMenuItem(title: title, action: #selector(MenuAction.fire), keyEquivalent: "")
-            item.target = action
-            item.representedObject = action  // menu items don't retain their target
-            if let symbol { item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
-            return item
-        }
-
-        /// A submenu that links to one of `titles`.
-        private func linkMenu(_ title: String, symbol: String, titles: [String], slash: Int) -> NSMenuItem {
-            let menu = NSMenu()
-            for target in titles.sorted(by: { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }) {
-                menu.addItem(item(target, symbol: nil) { [weak self] in self?.insert("[[\(target)]]", at: slash) })
+        /// The link items: picking one lists `titles` to link to.
+        private func links(_ title: String, symbol: String, titles: [String], slash: Int) -> SlashMenu.Item {
+            let children = titles.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { target in
+                SlashMenu.Item(title: target, symbol: symbol) { [weak self] in self?.insert("[[\(target)]]", at: slash) }
             }
-            let parent = item(title, symbol: symbol) {}
-            parent.submenu = menu
-            parent.isEnabled = !titles.isEmpty
-            return parent
+            return SlashMenu.Item(title: title, symbol: symbol, children: children)
         }
 
         private func showBlockMenu(slash: Int) {
             guard let textView, let layout = textView.layoutManager, let container = textView.textContainer,
                   slash < string.length, string.substring(with: NSRange(location: slash, length: 1)) == "/" else { return }
-            let menu = NSMenu()
-            for block in Self.blocks {
-                menu.addItem(item(block.title, symbol: block.symbol) { [weak self] in
+            var items = Self.blocks.map { block in
+                SlashMenu.Item(title: block.title, symbol: block.symbol) { [weak self] in
                     // Code blocks put the cursor on the empty line between the fences.
                     self?.insert(block.text, at: slash, cursor: block.text.hasPrefix("```") ? 4 : nil)
-                })
+                }
             }
-            menu.addItem(item("Data de hoje", symbol: "calendar") { [weak self] in
+            items.append(SlashMenu.Item(title: "Data de hoje", symbol: "calendar") { [weak self] in
                 self?.insert(Date().formatted(date: .numeric, time: .omitted), at: slash)
             })
-            menu.addItem(.separator())
-            menu.addItem(item("Página", symbol: "doc.badge.plus") { [weak self] in
+            items.append(SlashMenu.Item(title: "Página", symbol: "doc.badge.plus") { [weak self] in
                 guard let self, let title = parent.onNewSubpage() else { return }
                 insert("[[\(title)]]", at: slash)
             })
-            menu.addItem(linkMenu("Link para página", symbol: "link", titles: parent.pages, slash: slash))
-            menu.addItem(linkMenu("Mencionar objetivo", symbol: "target", titles: parent.goals, slash: slash))
-            menu.addItem(linkMenu("Mencionar tarefa", symbol: "checkmark.circle", titles: parent.tasks, slash: slash))
+            items.append(links("Link para página", symbol: "link", titles: parent.pages, slash: slash))
+            items.append(links("Mencionar objetivo", symbol: "target", titles: parent.goals, slash: slash))
+            items.append(links("Mencionar tarefa", symbol: "checkmark.circle", titles: parent.tasks, slash: slash))
 
             let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: slash, length: 1), actualCharacterRange: nil)
             var rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
             rect.origin.x += textView.textContainerOrigin.x
             rect.origin.y += textView.textContainerOrigin.y
-            menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: textView)
+            let menu = SlashMenu(slash: slash, items: items) { [weak self] in self?.pick($0) }
+            menu.popupID = Overlays.shared.show(AnyView(SlashMenuView(menu: menu)), at: textView.globalRect(rect))
+            slashMenu = menu
+        }
+
+        private func pick(_ item: SlashMenu.Item) {
+            guard let menu = openSlashMenu, let textView else { return }
+            if let children = item.children {
+                guard !children.isEmpty else { return }
+                menu.open(children, from: textView.selectedRange().location)
+                return
+            }
+            closeSlashMenu()
+            item.run()
+            textView.window?.makeFirstResponder(textView)
+        }
+
+        /// Filters the list by what was typed after the `/`, or closes it once the slash is gone.
+        private func updateSlashQuery() {
+            guard let menu = slashMenu else { return }
+            guard openSlashMenu != nil, let textView else { return closeSlashMenu() }
+            let cursor = textView.selectedRange().location
+            guard menu.slash < string.length, string.substring(with: NSRange(location: menu.slash, length: 1)) == "/",
+                  cursor >= menu.queryStart else { return closeSlashMenu() }
+            let query = string.substring(with: NSRange(location: menu.queryStart, length: cursor - menu.queryStart))
+            if query.contains("\n") || query.hasPrefix(" ") || (query.hasSuffix(" ") && menu.items.isEmpty) {
+                return closeSlashMenu()
+            }
+            menu.query = query
+            menu.selected = 0
+        }
+
+        private func closeSlashMenu() {
+            if openSlashMenu != nil { Overlays.shared.closePopup() }
+            slashMenu = nil
         }
 
         /// Replaces the `/` with `text`, leaving the cursor at its end or `cursor` characters in.
         private func insert(_ text: String, at slash: Int, cursor: Int? = nil) {
             guard slash < string.length, string.substring(with: NSRange(location: slash, length: 1)) == "/" else { return }
+            // Takes what was typed to filter the list along with the slash.
+            let end = min(max(slash + 1, textView?.selectedRange().location ?? 0), string.length)
             let offset = cursor ?? (text as NSString).length
-            replace(NSRange(location: slash, length: 1), with: text, selecting: NSRange(location: slash + offset, length: 0))
+            replace(NSRange(location: slash, length: end - slash), with: text, selecting: NSRange(location: slash + offset, length: 0))
+        }
+    }
+}
+
+/// The `/` list of a note: blocks to insert, narrowed by what is typed after the slash.
+@MainActor @Observable
+final class SlashMenu {
+    struct Item: Identifiable {
+        let id = UUID()
+        let title: String
+        let symbol: String
+        /// Titles to choose from next, for the link items.
+        var children: [Item]?
+        var run: () -> Void = {}
+    }
+
+    let slash: Int
+    let root: [Item]
+    let onPick: (Item) -> Void
+    var popupID: UUID?
+    /// Where the filter text starts: after the slash, or where a link list was opened.
+    private(set) var queryStart: Int
+    private var group: [Item]?
+    var query = ""
+    var selected = 0
+
+    init(slash: Int, items: [Item], onPick: @escaping (Item) -> Void) {
+        self.slash = slash
+        root = items
+        queryStart = slash + 1
+        self.onPick = onPick
+    }
+
+    var items: [Item] {
+        guard !query.isEmpty else { return group ?? root }
+        // At the top, typing also finds pages, goals and tasks by name.
+        let pool = group ?? root + root.flatMap { $0.children ?? [] }
+        return pool.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    func open(_ children: [Item], from cursor: Int) {
+        group = children
+        queryStart = cursor
+        query = ""
+        selected = 0
+    }
+
+    func move(_ step: Int) {
+        let count = items.count
+        guard count > 0 else { return }
+        selected = (selected + step + count) % count
+    }
+}
+
+private struct SlashMenuView: View {
+    let menu: SlashMenu
+
+    var body: some View {
+        let items = menu.items
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if items.isEmpty {
+                        Text("Nada encontrado").foregroundStyle(Theme.secondaryText).padding(8)
+                    }
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        HStack(spacing: 8) {
+                            Image(systemName: item.symbol).frame(width: 16).foregroundStyle(Theme.secondaryText)
+                            Text(item.title).lineLimit(1)
+                            Spacer(minLength: 8)
+                            if item.children != nil {
+                                Image(systemName: "chevron.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(height: 28)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(index == menu.selected ? Theme.hover : .clear))
+                        .contentShape(Rectangle())
+                        .onHover { if $0 { menu.selected = index } }
+                        .onTapGesture { menu.onPick(item) }
+                        .opacity(item.children?.isEmpty == true ? 0.4 : 1)
+                        .id(index)
+                    }
+                }
+            }
+            .frame(width: 240, height: min(CGFloat(max(items.count, 1)) * 28 + 4, 320))
+            .onChange(of: menu.selected) { proxy.scrollTo(menu.selected) }
         }
     }
 }
@@ -412,7 +542,7 @@ struct TableGrid: View {
                 HStack(spacing: 0) {
                     ForEach(0..<columns, id: \.self) { column in
                         TableCell(value: rows[row][column], header: row == 0) { set(row, column, $0) }
-                            .contextMenu {
+                            .appContextMenu {
                                 if row > 0 { Button("Apagar linha") { onChange(rows.enumerated().filter { $0.offset != row }.map(\.element)) } }
                                 if columns > 1 {
                                     Button("Apagar coluna") {

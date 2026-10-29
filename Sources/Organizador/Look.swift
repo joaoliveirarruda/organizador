@@ -14,6 +14,7 @@ enum Theme {
     static let card = Color(hex: "1d2225")
     static let accent = Color(hex: "b8e2ca")
     static let onAccent = Color(hex: "17352a")
+    static let danger = Color(hex: "ff7b72")
 
     static func font(size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .custom("Inter", size: size).weight(weight)
@@ -113,9 +114,8 @@ struct PageHeader<Title: View>: View {
     let setCover: (String?) -> Void
     @ViewBuilder let title: Title
     @State private var hovering = false
-    @State private var editingEmoji = false
-    @State private var emoji = ""
-    @FocusState private var emojiFocused: Bool
+    /// Where the icon (or "Adicionar ícone") is, so the emoji field opens under it.
+    @State private var iconFrame = CGRect.zero
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -135,23 +135,22 @@ struct PageHeader<Title: View>: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 if icon != nil {
-                    Menu {
+                    PopupMenu {
                         iconMenu
                     } label: {
                         IconView(icon: icon, base: base, fallback: fallback, size: 64)
                     }
-                    .menuStyle(.borderlessButton)
-                    .menuIndicator(.hidden)
+                    .buttonStyle(.plain)
                     .fixedSize()
-                    .popover(isPresented: $editingEmoji, arrowEdge: .bottom) { emojiPicker }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { iconFrame = $0 }
                     .offset(y: cover == nil ? 0 : -32)
                     .padding(.bottom, cover == nil ? 0 : -32)
                 }
                 HStack(spacing: 12) {
                     if icon == nil {
-                        Menu("Adicionar ícone") { iconMenu }
-                            .menuStyle(.borderlessButton).fixedSize()
-                            .popover(isPresented: $editingEmoji, arrowEdge: .bottom) { emojiPicker }
+                        PopupMenu("Adicionar ícone") { iconMenu }
+                            .buttonStyle(.plain).fixedSize()
+                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { iconFrame = $0 }
                     }
                     if cover == nil {
                         Button("Adicionar capa") { pickCover() }
@@ -169,27 +168,10 @@ struct PageHeader<Title: View>: View {
         .onHover { hovering = $0 }
     }
 
-    /// A field that opens the Mac emoji picker right away; picking one sets it as the icon.
-    private var emojiPicker: some View {
-        TextField("Emoji", text: $emoji)
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 120)
-            .focused($emojiFocused)
-            .onSubmit(commitEmoji)
-            .onChange(of: emoji) { if !emoji.isEmpty { commitEmoji() } }
-            .padding(12)
-            .onAppear {
-                emojiFocused = true
-                // The picker types into whatever has focus, so wait for the field to take it.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { NSApp.orderFrontCharacterPalette(nil) }
-            }
-    }
-
     @ViewBuilder
     private var iconMenu: some View {
         Button("Emoji…") {
-            emoji = ""
-            editingEmoji = true
+            Overlays.shared.show(AnyView(EmojiField(setIcon: setIcon)), at: iconFrame)
         }
         Button("Foto…") {
             if let path = ImageFiles.pick(into: imagesFolder, relativeTo: base) { setIcon(.image(path)) }
@@ -200,14 +182,36 @@ struct PageHeader<Title: View>: View {
         }
     }
 
-    private func commitEmoji() {
-        let text = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
-        setIcon(text.isEmpty ? nil : .emoji(String(text.prefix(2))))
-        editingEmoji = false
-    }
-
     private func pickCover() {
         if let path = ImageFiles.pick(into: imagesFolder, relativeTo: base) { setCover(path) }
+    }
+}
+
+/// A field that opens the Mac emoji picker right away; picking one sets it as the icon.
+private struct EmojiField: View {
+    let setIcon: (Icon?) -> Void
+    @State private var emoji = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("Emoji", text: $emoji)
+            .textFieldStyle(AppFieldStyle())
+            .frame(width: 120)
+            .focused($focused)
+            .onSubmit(commit)
+            .onChange(of: emoji) { if !emoji.isEmpty { commit() } }
+            .padding(6)
+            .onAppear {
+                focused = true
+                // The picker types into whatever has focus, so wait for the field to take it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { NSApp.orderFrontCharacterPalette(nil) }
+            }
+    }
+
+    private func commit() {
+        let text = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        setIcon(text.isEmpty ? nil : .emoji(String(text.prefix(2))))
+        Overlays.shared.closePopup()
     }
 }
 
@@ -276,9 +280,20 @@ struct AppActionButtonStyle: ButtonStyle {
     var width: CGFloat? = 260
 
     func makeBody(configuration: Configuration) -> some View {
+        ActionButton(configuration: configuration, primary: primary, width: width)
+    }
+}
+
+private struct ActionButton: View {
+    let configuration: ButtonStyleConfiguration
+    let primary: Bool
+    let width: CGFloat?
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
         configuration.label
             .font(Theme.font(size: 13, weight: .medium))
-            .foregroundStyle(primary ? Theme.onAccent : Theme.text)
+            .foregroundStyle(primary ? Theme.onAccent : configuration.role == .destructive ? Theme.danger : Theme.text)
             .frame(width: width, height: width == nil ? 30 : 44)
             .padding(.horizontal, 12)
             .background(
@@ -287,6 +302,7 @@ struct AppActionButtonStyle: ButtonStyle {
                     .opacity(configuration.isPressed ? 0.78 : 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: 8))
+            .opacity(isEnabled ? 1 : 0.45)
     }
 }
 

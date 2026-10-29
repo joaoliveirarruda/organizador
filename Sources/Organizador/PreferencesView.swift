@@ -46,7 +46,7 @@ struct PreferencesView: View {
 
             if selectedSection == "Cronômetro" {
             Section("Cronômetro") {
-                Stepper(
+                NumberStepper(
                     "Meta diária: \(preferences.dailyTargetMinutes == 0 ? "sem meta" : DurationFormat.short(TimeInterval(preferences.dailyTargetMinutes * 60)))",
                     value: Binding(
                         get: { preferences.dailyTargetMinutes },
@@ -56,7 +56,7 @@ struct PreferencesView: View {
                     step: 30
                 )
 
-                Stepper(
+                NumberStepper(
                     "Pausar após \(preferences.idlePauseMinutes == 0 ? "nunca (desligado)" : "\(preferences.idlePauseMinutes) min sem usar o Mac")",
                     value: Binding(
                         get: { preferences.idlePauseMinutes },
@@ -206,15 +206,12 @@ private struct CalendarExportStatus: View {
         let exporter = model.calendarExport
         switch exporter.access {
         case .granted:
-            Picker("Calendário", selection: Binding(
+            ChoicePicker("Calendário", selection: Binding(
                 get: { model.data.preferences.exportCalendarID },
                 set: { model.setExportCalendar($0) }
-            )) {
-                Text("Padrão do Mac").tag("")
-                ForEach(exporter.calendars, id: \.calendarIdentifier) { calendar in
-                    Text("\(calendar.title) · \(calendar.source.title)").tag(calendar.calendarIdentifier)
-                }
-            }
+            ), choices: [Choice(value: "", title: "Padrão do Mac")] + exporter.calendars.map {
+                Choice(value: $0.calendarIdentifier, title: "\($0.title) · \($0.source.title)", color: Color(nsColor: $0.color))
+            })
         case .denied:
             VStack(alignment: .leading, spacing: 6) {
                 Label("O Organizador não tem acesso ao Calendário, então os eventos não são criados.", systemImage: "exclamationmark.triangle")

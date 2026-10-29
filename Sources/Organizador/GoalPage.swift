@@ -45,8 +45,8 @@ struct GoalPage: View {
             .padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(isPresented: $editing) { GoalEditor(goal: goal) }
-        .sheet(isPresented: $addingArea) { ActivityEditor(activity: nil, goalID: goal.id) }
+        .floatingSheet(isPresented: $editing) { GoalEditor(goal: goal) }
+        .floatingSheet(isPresented: $addingArea) { ActivityEditor(activity: nil, goalID: goal.id) }
     }
 
     private func update(_ change: (inout Goal) -> Void) {
@@ -68,24 +68,24 @@ struct GoalPage: View {
                 Button("Criar atividade para cronometrar", systemImage: "plus") { addingArea = true }
                     .buttonStyle(.heading(primary: true))
             } else {
-                Menu {
+                PopupMenu {
                     ForEach(areas) { area in
                         Button(area.name) { model.start(area.id) }
                     }
                 } label: {
                     menuLabel("Trabalhar nisso", systemImage: "play.fill")
                 }
-                .menuStyle(.button).buttonStyle(.heading(primary: true)).menuIndicator(.hidden).fixedSize()
+                .buttonStyle(.heading(primary: true)).fixedSize()
             }
             Spacer()
-            Menu {
+            PopupMenu {
                 Button("Ativo") { model.setGoalStatus(goal.id, .active) }
                 Button("Pausar") { model.setGoalStatus(goal.id, .paused) }
                 Button("Encerrar") { model.setGoalStatus(goal.id, .closed) }
             } label: {
                 menuLabel(statusTitle)
             }
-            .menuStyle(.button).buttonStyle(.heading()).menuIndicator(.hidden).fixedSize()
+            .buttonStyle(.heading()).fixedSize()
             .help("Estado do objetivo")
             Button("Editar") { editing = true }.buttonStyle(.heading())
         }
@@ -99,7 +99,7 @@ struct GoalPage: View {
         }
     }
 
-    /// A menu's label with a small chevron, since the system indicator does not take the app's style.
+    /// A menu's label with a small chevron.
     private func menuLabel(_ title: String, systemImage: String? = nil) -> some View {
         HStack(spacing: 6) {
             if let systemImage { Image(systemName: systemImage) }
@@ -275,7 +275,7 @@ private struct StateBadge: View {
 
 struct GoalEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let goal: Goal?
     @State private var title: String
     @State private var hasTarget: Bool
@@ -304,32 +304,32 @@ struct GoalEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(goal == nil ? "Novo objetivo" : "Editar objetivo").font(.headline)
+            Text(goal == nil ? "Novo objetivo" : "Editar objetivo").font(Theme.font(size: 16, weight: .semibold))
 
-            Form {
+            VStack(alignment: .leading, spacing: 6) {
                 TextField("Título", text: $title)
 
                 Toggle("Alvo em horas", isOn: $hasTarget)
                 if hasTarget {
-                    TextField("Horas", value: $targetHours, format: .number)
+                    LabeledContent("Horas") { TextField("", value: $targetHours, format: .number).frame(width: 90) }
                 }
 
                 Toggle("Prazo", isOn: $hasDeadline)
                 if hasDeadline {
-                    DatePicker("Até", selection: $deadline, displayedComponents: .date)
+                    DateField("Até", selection: $deadline, displayedComponents: .date)
                 }
 
-                DatePicker("Contar tempo a partir de", selection: $startDate, displayedComponents: .date)
+                DateField("Contar tempo a partir de", selection: $startDate, displayedComponents: .date)
 
-                Section("Fio da meada") {
+                FormSection("Fio da meada") {
                     Toggle("Ritmo semanal pretendido", isOn: $hasWeekly)
                     if hasWeekly {
-                        TextField("Horas por semana", value: $weeklyHours, format: .number)
+                        LabeledContent("Horas por semana") { TextField("", value: $weeklyHours, format: .number).frame(width: 90) }
                     }
-                    Stepper("Parado após \(GoalThreads.days(staleDays)) sem mexer", value: $staleDays, in: 1...90)
+                    NumberStepper("Parado após \(GoalThreads.days(staleDays)) sem mexer", value: $staleDays, in: 1...90)
                 }
 
-                Section("Atividades que contam para este objetivo") {
+                FormSection("Atividades que contam para este objetivo") {
                     if model.activeActivities.isEmpty {
                         Text("Crie atividades no Cronômetro primeiro.")
                             .foregroundStyle(.secondary)
@@ -351,8 +351,6 @@ struct GoalEditor: View {
                     }
                 }
             }
-            .formStyle(.grouped)
-            .frame(minHeight: 420)
 
             HStack {
                 if goal != nil {
@@ -365,12 +363,13 @@ struct GoalEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(!canSave)
             }
         }
         .padding(20)
         .frame(width: 480)
-        .confirmationDialog("Excluir objetivo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .appConfirm("Excluir objetivo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             if let goal {
                 Button("Excluir objetivo", role: .destructive) {
                     model.deleteGoal(goal.id)
