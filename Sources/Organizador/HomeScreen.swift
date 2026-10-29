@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// Hoje: one day at a time — meetings and timed work in one timeline, the day's tasks and habits.
@@ -31,14 +32,12 @@ struct HomeScreen: View {
                 if isToday {
                     StartBox()
                     if let notice = model.pauseNotice {
-                        HStack {
-                            Image(systemName: "pause.circle")
-                            Text(notice)
-                            Spacer()
-                            Button("OK") { model.pauseNotice = nil }
+                        ShadcnAlert(systemImage: "pause.circle") {
+                            HStack {
+                                ShadcnAlertDescription(notice)
+                                Button("OK") { model.pauseNotice = nil }.buttonStyle(.heading())
+                            }
                         }
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                     }
                 }
 
@@ -47,10 +46,8 @@ struct HomeScreen: View {
                 } accessory: {
                     if model.hasCalendar {
                         CalendarSyncStatus()
-                        Button { model.refreshCalendar() } label: {
-                            Image(systemName: "arrow.clockwise").frame(width: 28, height: 28).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                        Button { model.refreshCalendar() } label: { Image(systemName: "arrow.clockwise") }
+                        .buttonStyle(.shadcn(.ghost, size: .iconSM))
                         .accessibilityLabel("Atualizar agenda")
                         .help("Atualizar agenda")
                     }
@@ -63,14 +60,14 @@ struct HomeScreen: View {
                 PageSection(title: "Tarefas") {
                     tasks(isToday: isToday)
                 } accessory: {
-                    Button("Todas   ›") { model.route = .tasks }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                    Button("Todas   ›") { model.route = .tasks }.buttonStyle(.shadcn(.ghost, size: .small))
                 }
 
                 PageSection(title: "Hábitos") {
                     habits
                 } accessory: {
                     if !model.data.habits.isEmpty {
-                        Button("Constância   ›") { model.route = .habits }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                        Button("Constância   ›") { model.route = .habits }.buttonStyle(.shadcn(.ghost, size: .small))
                     }
                     Button("Hábito", systemImage: "plus") { addingHabit = true }.buttonStyle(.heading())
                 }
@@ -122,7 +119,7 @@ struct HomeScreen: View {
             if !model.hasCalendar {
                 HStack(spacing: 6) {
                     Text("Conecte uma agenda para ver seus compromissos aqui.").foregroundStyle(Theme.secondaryText)
-                    Button("Conectar   ›") { model.route = .settingsSection(SettingsSection.calendar.rawValue) }.buttonStyle(.plain)
+                    Button("Conectar   ›") { model.route = .settingsSection(SettingsSection.calendar.rawValue) }.buttonStyle(.shadcn(.link, size: .xs))
                 }
                 .font(Theme.font(size: 12))
             }
@@ -139,9 +136,9 @@ struct HomeScreen: View {
             HStack(spacing: 10) {
                 Image(systemName: "plus").foregroundStyle(Theme.secondaryText).frame(width: 22)
                 TextField("Nova tarefa para este dia (Enter para adicionar)", text: $newTask)
-                    .textFieldStyle(.plain)
+                    .textFieldStyle(AppFieldStyle())
                     .onSubmit(addTask)
-                Button("Detalhes…") { creatingTask = true }.buttonStyle(.plain).foregroundStyle(Theme.secondaryText)
+                Button("Detalhes…") { creatingTask = true }.buttonStyle(.shadcn(.ghost, size: .small))
             }
             ForEach(tasks) { task in
                 TaskRow(task: task)
@@ -271,12 +268,10 @@ struct StartBox: View {
                 .buttonStyle(.plain)
             }
             Button("Criar e começar outra atividade   ›") { showingNewActivity = true }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.text)
+                .buttonStyle(.shadcn(.ghost, size: .small))
         }
-        .padding(20)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border.opacity(0.5)))
+        .padding(Space.x6)
+        .cardChrome()
         .floatingSheet(isPresented: $showingNewActivity) { ActivityEditor(activity: nil) }
     }
 
@@ -295,7 +290,7 @@ private struct ThreadRow: View {
                 IconView(icon: goal.icon, base: model.imagesFolder, fallback: "flag", size: 18)
                 Text(goal.title).frame(width: 200, alignment: .leading).lineLimit(1)
                 if let fraction = progress.fraction {
-                    ProgressView(value: fraction).tint(Theme.accent)
+                    ShadcnProgress(value: fraction)
                 } else {
                     Spacer()
                 }
@@ -328,15 +323,9 @@ struct HabitTodayRow: View {
         let done = tracker.isDone(habit, on: now)
         let onlyByTimer = tracker.isDoneByTimer(habit, on: now) && !tracker.isChecked(habit, on: now)
         HStack(spacing: 10) {
-            Button {
-                model.toggleHabit(habit.id, on: now)
-            } label: {
-                Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(Color(hex: habit.colorHex))
-            }
-            .buttonStyle(.plain)
-            .disabled(onlyByTimer)
+            ShadcnCheckbox(isChecked: Binding(get: { done }, set: { _ in model.toggleHabit(habit.id, on: now) }))
+                .shadcnTint(Color(hex: habit.colorHex))
+                .disabled(onlyByTimer)
             Text(habit.name)
             Spacer()
             let streak = tracker.currentStreak(habit, now: now)

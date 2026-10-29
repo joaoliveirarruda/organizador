@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// One box that finds notes, objectives, areas and tasks by name (and notes by content).
@@ -16,8 +17,8 @@ struct SearchScreen: View {
                     .textFieldStyle(.plain)
                     .font(Theme.font(size: 16))
                     .focused($focused)
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.card))
+                    .padding(.vertical, 10)
+                    .fieldChrome()
                 if !text.isEmpty {
                     results(text)
                 }

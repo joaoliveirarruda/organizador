@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// The timer, Yeolpumta style: today's total in the running area's color, every area one click away,
@@ -16,14 +17,12 @@ struct TimerScreen: View {
                 TimerHeader()
 
                 if let notice = model.pauseNotice {
-                    HStack {
-                        Image(systemName: "pause.circle")
-                        Text(notice)
-                        Spacer()
-                        Button("OK") { model.pauseNotice = nil }
+                    ShadcnAlert(systemImage: "pause.circle") {
+                        HStack {
+                            ShadcnAlertDescription(notice)
+                            Button("OK") { model.pauseNotice = nil }.buttonStyle(.heading())
+                        }
                     }
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.yellow.opacity(0.15)))
                 }
 
                 PageSection(title: "Atividades") {
@@ -141,11 +140,10 @@ private struct AreaTimerRow: View {
         let goal = area.goalID.flatMap(model.goal)
         HStack(spacing: 12) {
             Button { model.toggle(area.id) } label: {
-                Image(systemName: isRunning ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.title)
-                    .foregroundStyle(color)
+                Image(systemName: isRunning ? "pause.fill" : "play.fill")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.shadcn(isRunning ? .primary : .outline, size: .iconSM))
+            .shadcnTint(color)
             .help(isRunning ? "Pausar" : "Começar")
             Button { model.route = .area(area.id) } label: {
                 HStack(spacing: 8) {
@@ -157,7 +155,7 @@ private struct AreaTimerRow: View {
                             HStack(spacing: 6) {
                                 Text(goal.title).font(.caption).foregroundStyle(Theme.secondaryText)
                                 if let fraction = model.progress(for: goal).fraction {
-                                    ProgressView(value: fraction).tint(color).frame(width: 80)
+                                    ShadcnProgress(value: fraction).shadcnTint(color).frame(width: 80)
                                 }
                             }
                         }
@@ -173,7 +171,7 @@ private struct AreaTimerRow: View {
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(isRunning ? color.opacity(0.15) : Theme.card))
+        .cardChrome(fill: isRunning ? color.opacity(0.15) : nil)
     }
 }
 
@@ -194,7 +192,7 @@ struct DayCalendar: View {
                 Text("Calendário do dia").font(Theme.font(size: 13, weight: .semibold)).foregroundStyle(Theme.secondaryText)
                 Spacer()
                 Button { addingSession = true } label: { Image(systemName: "plus") }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.shadcn(.ghost, size: .iconSM))
                     .help("Incluir sessão à mão")
                     .disabled(model.activeActivities.isEmpty)
             }
@@ -206,7 +204,7 @@ struct DayCalendar: View {
                             ForEach(0..<24, id: \.self) { hour in
                                 HStack(alignment: .top) {
                                     Text("\(hour)h").font(.caption2).foregroundStyle(Theme.secondaryText).frame(width: 28, alignment: .trailing)
-                                    VStack { Divider() }
+                                    VStack { ShadcnSeparator() }
                                 }
                                 .frame(height: hourHeight, alignment: .top)
                                 .id(hour)

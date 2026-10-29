@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// Time per area, and per activity inside each, for the chosen period. Read-only.
@@ -44,7 +45,7 @@ struct ReportScreen: View {
                 }
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+                .cardChrome()
             }
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
             .pageColumn()

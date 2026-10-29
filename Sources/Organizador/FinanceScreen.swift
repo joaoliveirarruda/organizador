@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -135,7 +136,7 @@ private struct MoneyTile: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+        .cardChrome()
     }
 }
 
@@ -194,8 +195,8 @@ private struct BudgetRow: View {
                     .foregroundStyle(over ? Color.red : Color.secondary)
             }
             if let budget, budget > 0 {
-                ProgressView(value: min(1, Double(spent) / Double(budget)))
-                    .tint(over ? Color.red : Color(hex: colorHex))
+                ShadcnProgress(value: min(1, Double(spent) / Double(budget)))
+                    .shadcnTint(over ? Color.red : Color(hex: colorHex))
             }
         }
     }
@@ -222,7 +223,7 @@ private struct TransactionRow: View {
                 Text(model.financeCategory(transaction.categoryID)?.name ?? "Categorizar")
                     .foregroundStyle(transaction.categoryID == nil ? Color.orange : Color.secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.shadcn(.ghost, size: .xs))
             .fixedSize()
             Text(Finance.format(cents: transaction.amountCents))
                 .monospacedDigit()
@@ -390,9 +391,9 @@ private struct CategoriesEditor: View {
         Button {
             drafts.removeAll { $0.id == id }
         } label: {
-            Image(systemName: "minus.circle")
+            Image(systemName: "minus")
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.shadcn(.ghost, size: .iconXS))
         .help("Remover categoria")
     }
 

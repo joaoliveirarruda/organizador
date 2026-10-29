@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,6 +16,28 @@ enum Theme {
     static let accent = Color(hex: "b8e2ca")
     static let onAccent = Color(hex: "17352a")
     static let danger = Color(hex: "ff7b72")
+
+    /// The same colors as shadcn tokens, so ShadKit components blend in. The app is dark-only,
+    /// so both appearances get one palette.
+    static let shadcn: ShadcnTheme = {
+        let palette = ShadcnPaletteSpec(cssVars: [
+            "background": "#111417", "foreground": "#f0f2ef",
+            "card": "#1d2225", "card-foreground": "#f0f2ef",
+            "popover": "#191d20", "popover-foreground": "#f0f2ef",
+            "primary": "#b8e2ca", "primary-foreground": "#17352a",
+            "secondary": "#252b2d", "secondary-foreground": "#f0f2ef",
+            "muted": "#252b2d", "muted-foreground": "#a2adaa",
+            "accent": "#252b2d", "accent-foreground": "#f0f2ef",
+            "destructive": "#ff7b72",
+            "border": "#303638", "input": "#303638", "ring": "#b8e2ca",
+            "sidebar": "#191d20", "sidebar-foreground": "#f0f2ef",
+            "sidebar-primary": "#b8e2ca", "sidebar-primary-foreground": "#17352a",
+            "sidebar-accent": "#252b2d", "sidebar-accent-foreground": "#f0f2ef",
+            "sidebar-border": "#303638", "sidebar-ring": "#b8e2ca",
+        ])
+        return ShadcnTheme(light: palette, dark: palette, radius: ShadcnRadius(base: 8),
+                           typography: ShadcnTypography(sansFamily: "Inter"))
+    }()
 
     static func font(size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .custom("Inter", size: size).weight(weight)
@@ -177,7 +200,7 @@ struct PageHeader<Title: View>: View {
             if let path = ImageFiles.pick(into: imagesFolder, relativeTo: base) { setIcon(.image(path)) }
         }
         if icon != nil {
-            Divider()
+            ShadcnMenuSeparator()
             Button("Remover ícone") { setIcon(nil) }
         }
     }
@@ -222,20 +245,20 @@ struct PageSection<Content: View, Accessory: View>: View {
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        ShadcnCard {
             // An empty title drops the header row, for cards that need no name.
             if !title.isEmpty {
-                HStack {
-                    Text(title).font(Theme.font(size: 16, weight: .semibold)).foregroundStyle(Theme.text)
-                    Spacer()
+                // Not ShadcnCardHeader: it top-aligns, and an accessory of several views
+                // (sync status, refresh, button) would each sit at the top instead of centered.
+                HStack(spacing: Space.x2) {
+                    ShadcnCardTitle(title)
+                    Spacer(minLength: 0)
                     accessory
                 }
+                .padding(.horizontal, Space.x6)
             }
-            content
+            ShadcnCardContent { content }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
     }
 }
 
@@ -280,29 +303,10 @@ struct AppActionButtonStyle: ButtonStyle {
     var width: CGFloat? = 260
 
     func makeBody(configuration: Configuration) -> some View {
-        ActionButton(configuration: configuration, primary: primary, width: width)
-    }
-}
-
-private struct ActionButton: View {
-    let configuration: ButtonStyleConfiguration
-    let primary: Bool
-    let width: CGFloat?
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        configuration.label
-            .font(Theme.font(size: 13, weight: .medium))
-            .foregroundStyle(primary ? Theme.onAccent : configuration.role == .destructive ? Theme.danger : Theme.text)
-            .frame(width: width, height: width == nil ? 30 : 44)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(primary ? Theme.accent : Theme.hover)
-                    .opacity(configuration.isPressed ? 0.78 : 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8))
-            .opacity(isEnabled ? 1 : 0.45)
+        let variant: ShadcnButtonVariant = primary ? .primary : configuration.role == .destructive ? .destructive : .outline
+        ShadcnButtonStyle(variant: variant, size: width == nil ? .small : .large, fillsWidth: width != nil)
+            .makeBody(configuration: configuration)
+            .frame(width: width)
     }
 }
 
@@ -321,56 +325,30 @@ struct PeriodStepper: View {
     let reset: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        ShadcnButtonGroup {
             arrow("Anterior", "chevron.left") { step(-1) }
-            Button(action: reset) {
-                Text(currentTitle).padding(.horizontal, 6).frame(height: 30).contentShape(Rectangle())
-            }
-            .disabled(isCurrent)
+            Button(currentTitle, action: reset)
+                .buttonStyle(.shadcn(.ghost, size: .small))
+                .disabled(isCurrent)
             arrow("Próximo", "chevron.right") { step(1) }
         }
-        .buttonStyle(.plain)
-        .font(Theme.font(size: 13, weight: .medium))
-        .contentShape(Rectangle())
-        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
     }
 
-    /// The whole 30×30 square is clickable, not just the chevron.
     private func arrow(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).frame(width: 30, height: 30).contentShape(Rectangle())
-        }
-        .accessibilityLabel(title)
-        .help(title)
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(.shadcn(.ghost, size: .iconSM))
+            .accessibilityLabel(title)
+            .help(title)
     }
 }
 
-/// A choice between a few views, in the app's own look: same height, colors and corners as the heading buttons.
+/// A choice between a few views, as shadcn tabs.
 struct SegmentedTabs<Value: Hashable>: View {
     let options: [(value: Value, title: String)]
     @Binding var selection: Value
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(options.indices, id: \.self) { index in
-                let option = options[index]
-                let selected = option.value == selection
-                Button { selection = option.value } label: {
-                    Text(option.title)
-                        .font(Theme.font(size: 13, weight: .medium))
-                        .foregroundStyle(selected ? Theme.text : Theme.secondaryText)
-                        .padding(.horizontal, 12)
-                        .frame(height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Theme.border : .clear))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-        .padding(2)
-        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.hover))
-        .accessibilityElement(children: .contain)
+        ShadcnTabs(selection: $selection, items: options.map { ($0.value, $0.title) })
     }
 }
 
@@ -391,6 +369,37 @@ extension PageSection where Accessory == EmptyView {
     init(title: String, @ViewBuilder content: () -> Content) {
         self.init(title: title, content: content, accessory: { EmptyView() })
     }
+}
+
+/// shadcn's card surface (`bg-card border rounded-xl shadow-sm`) for blocks that lay out their own content.
+private struct CardChrome: ViewModifier {
+    var fill: Color?
+    @Environment(\.shadcnPalette) private var palette
+    @Environment(\.shadcnTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .background(RoundedRectangle(cornerRadius: theme.radius.xl, style: .continuous).fill(fill ?? palette.card))
+            .shadcnBorder(palette.border, cornerRadius: theme.radius.xl)
+            .shadcnShadow(.sm)
+    }
+}
+
+/// Repaints ShadKit's `primary` below this view, for progress bars and checkboxes that carry a category color.
+private struct ShadcnTint: ViewModifier {
+    let color: Color
+    @Environment(\.shadcnPalette) private var palette
+
+    func body(content: Content) -> some View {
+        var tinted = palette
+        tinted.primary = color
+        return content.environment(\.shadcnPalette, tinted)
+    }
+}
+
+extension View {
+    func cardChrome(fill: Color? = nil) -> some View { modifier(CardChrome(fill: fill)) }
+    func shadcnTint(_ color: Color) -> some View { modifier(ShadcnTint(color: color)) }
 }
 
 /// Days until the deadline: "D-12", "D-dia", "D+3".

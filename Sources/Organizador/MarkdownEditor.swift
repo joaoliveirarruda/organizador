@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// Turns `MarkdownSpans` into text attributes. Shared by the editor and the PDF export.
@@ -549,15 +550,15 @@ struct TableGrid: View {
                                         onChange(rows.map { $0.enumerated().filter { $0.offset != column }.map(\.element) })
                                     }
                                 }
-                                Divider()
+                                ShadcnMenuSeparator()
                                 Button("Apagar tabela", role: .destructive) { onChange([]) }
                             }
-                        if column < columns - 1 { Divider() }
+                        if column < columns - 1 { ShadcnSeparator(.vertical) }
                     }
                 }
                 .frame(height: Self.rowHeight)
                 .background(row == 0 ? Theme.card : .clear)
-                Divider()
+                ShadcnSeparator()
             }
             HStack {
                 Button("Linha", systemImage: "plus") { onChange(rows + [Array(repeating: "", count: columns)]) }
@@ -565,9 +566,7 @@ struct TableGrid: View {
                     onChange(rows.enumerated().map { $1 + [$0 == 0 ? "Coluna \(columns + 1)" : ""] })
                 }
             }
-            .buttonStyle(.borderless)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.shadcn(.ghost, size: .xs, hasIcon: true))
             .frame(height: Self.rowHeight)
         }
         .overlay(alignment: .top) {

@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 struct EventRow: View {
@@ -47,11 +48,7 @@ private struct Badge: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.accentColor.opacity(0.2)))
+        ShadcnBadge(text, variant: .secondary)
     }
 }
 

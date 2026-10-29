@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 enum TaskFilter: String, CaseIterable, Identifiable {
@@ -38,11 +39,11 @@ struct TasksScreen: View {
                         HStack(spacing: 10) {
                             Image(systemName: "plus").foregroundStyle(Theme.secondaryText).frame(width: 22)
                             TextField("Adicionar tarefa (Enter)", text: $newTitle)
-                                .textFieldStyle(.plain)
+                                .textFieldStyle(AppFieldStyle())
                                 .onSubmit(addTask)
                         }
                         .padding(.vertical, 6)
-                        if !visible.isEmpty { Divider() }
+                        if !visible.isEmpty { ShadcnSeparator() }
                     }
                     if visible.isEmpty {
                         Text(emptyTitle + " · " + emptyDescription).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
@@ -118,14 +119,7 @@ struct TaskRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Button {
-                model.toggleTaskDone(task.id)
-            } label: {
-                Image(systemName: task.isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(task.isDone ? Color.green : Color.secondary)
-            }
-            .buttonStyle(.plain)
+            ShadcnCheckbox(isChecked: Binding(get: { task.isDone }, set: { _ in model.toggleTaskDone(task.id) }))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)

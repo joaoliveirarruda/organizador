@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 struct MenuBarLabel: View {
@@ -26,19 +27,19 @@ struct MenuBarView: View {
                     .monospacedDigit()
             }
             if model.dailyTarget > 0 {
-                ProgressView(value: min(1, model.todayTotal / model.dailyTarget))
+                ShadcnProgress(value: min(1, model.todayTotal / model.dailyTarget))
             }
             if let notice = model.pauseNotice {
                 Text(notice).font(.caption).foregroundStyle(.secondary)
             }
 
-            Divider()
+            ShadcnSeparator()
 
             ForEach(model.activeActivities) { activity in
                 ActivityToggleRow(activity: activity, compact: true)
             }
 
-            Divider()
+            ShadcnSeparator()
 
             HStack {
                 Button("Abrir Organizador") {

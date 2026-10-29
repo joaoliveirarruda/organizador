@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// A page of the main window.
@@ -31,6 +32,8 @@ struct ContentView: View {
         .overlay(alignment: .bottom) {
             if let error = model.lastError { ErrorToast(message: error) }
         }
+        // Outermost, so ShadKit's own popovers (selects) draw above the app's cards too.
+        .shadcnTheme(Theme.shadcn, glass: false)
     }
 
     @ViewBuilder
@@ -114,7 +117,7 @@ private struct Sidebar: View {
                             model.notes.saveNow()
                             NotePDF.export(Note(url: note.url, body: FrontMatter.parse(note.body).body, modifiedAt: note.modifiedAt))
                         }
-                        Divider()
+                        ShadcnMenuSeparator()
                         Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
                     }
                 }
@@ -226,16 +229,11 @@ private struct ErrorToast: View {
     let message: String
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(Theme.danger)
-            Text(message).lineLimit(3)
+        ShadcnAlert(variant: .destructive, systemImage: "exclamationmark.triangle") {
+            ShadcnAlertDescription(message)
         }
-        .font(Theme.font(size: 13))
-        .foregroundStyle(Theme.text)
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.sidebar))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
-        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+        .frame(maxWidth: 480)
+        .shadcnShadow(.lg)
         .padding(.bottom, 24)
         .onTapGesture { model.lastError = nil }
         .task(id: message) {

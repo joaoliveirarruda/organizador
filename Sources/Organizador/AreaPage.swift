@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// An area's own page: cover, today's sessions and the week, with manual add and edit
@@ -41,7 +42,7 @@ struct AreaPage: View {
                             Button { model.route = .goal(goal.id) } label: {
                                 Label(goal.title, systemImage: "flag")
                             }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.shadcn(.ghost, size: .small, hasIcon: true))
                         } else {
                             Text("Atividade solta").foregroundStyle(Theme.secondaryText)
                         }
@@ -67,7 +68,7 @@ struct AreaPage: View {
                         }
                     } accessory: {
                         Button("Incluir sessão", systemImage: "plus") { addingSession = true }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.heading())
                     }
                 }
                 .padding(.horizontal, 40)
