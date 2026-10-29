@@ -69,28 +69,21 @@ struct AreaSettings: View {
     @State private var deleting: Area?
 
     var body: some View {
-        Section("Áreas") {
+        SettingGroup {
             if model.areas.isEmpty {
-                Text("Nenhuma área ainda.").foregroundStyle(Theme.secondaryText)
+                SettingRow("Nenhuma área ainda", detail: "Crie uma para agrupar atividades, como Universidade ou Trabalho.") { EmptyView() }
             }
             ForEach(model.areas) { area in
-                Button { editing = area } label: {
-                    HStack(spacing: 8) {
-                        Circle().fill(Color(hex: area.colorHex)).frame(width: 10, height: 10)
-                        Text(area.name).foregroundStyle(Theme.text)
-                        Spacer()
-                        Text(activityCount(area)).foregroundStyle(Theme.secondaryText)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .appContextMenu {
+                SettingRow(area.name, detail: activityCount(area), dot: Color(hex: area.colorHex)) {
                     Button("Editar") { editing = area }
                     Button("Apagar", role: .destructive) { deleting = area }
                 }
             }
-            // Sheets hang off this one row: on a Section inside a Form they would be copied to every row.
+        } footnote: {
+            // Sheets hang off this one button so each opens once, not once per row.
             Button("Nova área") { adding = true }
+                .buttonStyle(.heading(primary: true))
+                .padding(.top, 8)
                 .floatingSheet(isPresented: $adding) { AreaEditor(area: nil) }
                 .floatingSheet(item: $editing) { AreaEditor(area: $0) }
                 .appConfirm(
