@@ -122,7 +122,7 @@ struct HomeScreen: View {
             if !model.hasCalendar {
                 HStack(spacing: 6) {
                     Text("Conecte uma agenda para ver seus compromissos aqui.").foregroundStyle(Theme.secondaryText)
-                    Button("Conectar   ›") { model.route = .settingsSection("Receber compromissos") }.buttonStyle(.plain)
+                    Button("Conectar   ›") { model.route = .settingsSection(SettingsSection.calendar.rawValue) }.buttonStyle(.plain)
                 }
                 .font(Theme.font(size: 12))
             }

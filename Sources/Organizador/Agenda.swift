@@ -68,13 +68,13 @@ struct CalendarSyncStatus: View {
                 }
             } else if let error = agenda.errorMessage {
                 Label("Erro", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Theme.danger)
                     .help(error)
             } else if let lastSync = agenda.lastSync {
                 Text("Atualizada \(lastSync.formatted(.relative(presentation: .named)))")
             }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
+        .font(Theme.font(size: 12))
+        .foregroundStyle(Theme.secondaryText)
     }
 }
