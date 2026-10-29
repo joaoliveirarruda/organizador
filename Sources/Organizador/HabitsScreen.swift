@@ -30,10 +30,10 @@ struct HabitsScreen: View {
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(isPresented: $addingHabit) {
+        .floatingSheet(isPresented: $addingHabit) {
             HabitEditor(habit: nil)
         }
-        .sheet(item: $editingHabit) { habit in
+        .floatingSheet(item: $editingHabit) { habit in
             HabitEditor(habit: habit)
         }
     }
@@ -97,15 +97,18 @@ struct HabitCard: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
-        .contextMenu {
+        .appContextMenu {
             Button("Editar", action: onEdit)
         }
-        .sheet(isPresented: $showingConsistency) {
+        .floatingSheet(isPresented: $showingConsistency) {
             VStack(alignment: .leading, spacing: 16) {
-                Text(habit.name).font(.title2.weight(.semibold))
+                Text(habit.name).font(Theme.font(size: 20, weight: .semibold))
                 Text("Constância · últimas 12 semanas").foregroundStyle(Theme.secondaryText)
                 HabitGrid(habit: habit, tracker: tracker, color: color, now: now)
-                Button("Fechar") { showingConsistency = false }.keyboardShortcut(.cancelAction)
+                HStack {
+                    Spacer()
+                    Button("Fechar") { showingConsistency = false }
+                }
             }
             .padding(24)
             .frame(width: 520)
@@ -169,7 +172,7 @@ struct HabitGrid: View {
 
 struct HabitEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let habit: Habit?
     @State private var name: String
     @State private var colorHex: String
@@ -189,27 +192,24 @@ struct HabitEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(habit == nil ? "Novo hábito" : "Editar hábito").font(.headline)
-            Form {
+            Text(habit == nil ? "Novo hábito" : "Editar hábito").font(Theme.font(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
                 TextField("Nome", text: $name)
                 HStack(spacing: 8) {
                     ForEach(Palette.colors, id: \.self) { hex in
                         Circle()
                             .fill(Color(hex: hex))
                             .frame(width: 22, height: 22)
-                            .overlay(Circle().stroke(Color.primary, lineWidth: hex == colorHex ? 2 : 0))
+                            .overlay(Circle().stroke(Theme.text, lineWidth: hex == colorHex ? 2 : 0))
                             .onTapGesture { colorHex = hex }
                     }
                 }
                 Toggle("Marcar sozinho pelo cronômetro", isOn: $isAutomatic)
                 if isAutomatic {
-                    Picker("Atividade", selection: $autoActivityID) {
-                        Text("Escolha…").tag(UUID?.none)
-                        ForEach(model.activeActivities) { activity in
-                            Text(activity.name).tag(Optional(activity.id))
-                        }
-                    }
-                    Stepper("Pelo menos \(autoMinutes) min no dia", value: $autoMinutes, in: 5...480, step: 5)
+                    ChoicePicker("Atividade", selection: $autoActivityID, choices: [Choice(value: nil, title: "Escolha…")] + model.activeActivities.map {
+                        Choice(value: Optional($0.id), title: $0.name, color: Color(hex: $0.colorHex))
+                    })
+                    NumberStepper("Pelo menos \(autoMinutes) min no dia", value: $autoMinutes, in: 5...480, step: 5)
                 }
             }
             HStack {
@@ -223,12 +223,13 @@ struct HabitEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(!canSave)
             }
         }
         .padding(20)
         .frame(width: 440)
-        .confirmationDialog("Excluir hábito?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+        .appConfirm("Excluir hábito?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             if let habit {
                 Button("Excluir hábito", role: .destructive) {
                     model.deleteHabit(habit.id)

@@ -27,16 +27,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: StaleNotifier.openHome)) { _ in model.route = .home }
         .preferredColorScheme(.dark)
-        .alert(
-            "Algo deu errado",
-            isPresented: Binding(
-                get: { model.lastError != nil },
-                set: { if !$0 { model.lastError = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.lastError ?? "")
+        .overlay { OverlayHost() }
+        .overlay(alignment: .bottom) {
+            if let error = model.lastError { ErrorToast(message: error) }
         }
     }
 
@@ -134,8 +127,8 @@ private struct Sidebar: View {
         }
         .background(Theme.sidebar)
         .foregroundStyle(Theme.text)
-        .sheet(isPresented: $addingGoal) { GoalEditor(goal: nil) }
-        .confirmationDialog("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
+        .floatingSheet(isPresented: $addingGoal) { GoalEditor(goal: nil) }
+        .appConfirm("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
             Button("Mover para o Lixo", role: .destructive) {
                 model.notes.trash(note)
                 if model.route == .note(note.url) { model.route = .notes }
@@ -216,13 +209,38 @@ private struct SidebarRow: View {
         .buttonStyle(.plain)
         .overlay(alignment: .trailing) {
             if let menu, hovering {
-                Menu { menu } label: {
+                PopupMenu { menu } label: {
                     Image(systemName: "ellipsis").foregroundStyle(Theme.secondaryText).frame(width: 30, height: 30).contentShape(Rectangle())
                 }
-                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+                .buttonStyle(.plain)
                 .padding(.trailing, 2)
             }
         }
         .onHover { hovering = $0 }
+    }
+}
+
+/// "Algo deu errado" as a note at the bottom of the window that goes away by itself or on a click.
+private struct ErrorToast: View {
+    @Environment(AppModel.self) private var model
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(Theme.danger)
+            Text(message).lineLimit(3)
+        }
+        .font(Theme.font(size: 13))
+        .foregroundStyle(Theme.text)
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.sidebar))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border))
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+        .padding(.bottom, 24)
+        .onTapGesture { model.lastError = nil }
+        .task(id: message) {
+            try? await Task.sleep(for: .seconds(6))
+            if model.lastError == message { model.lastError = nil }
+        }
     }
 }

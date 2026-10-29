@@ -49,7 +49,7 @@ struct FinanceScreen: View {
                         TransactionRow(transaction: transaction)
                             .contentShape(Rectangle())
                             .onTapGesture { editingTransaction = transaction }
-                            .contextMenu {
+                            .appContextMenu {
                                 Button("Editar") { editingTransaction = transaction }
                                 Button("Excluir", role: .destructive) { deletingTransaction = transaction }
                             }
@@ -60,16 +60,16 @@ struct FinanceScreen: View {
             .padding(.horizontal, 40).padding(.top, 28).padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(isPresented: $addingTransaction) {
+        .floatingSheet(isPresented: $addingTransaction) {
             TransactionEditor(transaction: nil, defaultDate: defaultDate(in: month))
         }
-        .sheet(item: $editingTransaction) { transaction in
+        .floatingSheet(item: $editingTransaction) { transaction in
             TransactionEditor(transaction: transaction, defaultDate: transaction.date)
         }
-        .sheet(isPresented: $editingCategories) {
+        .floatingSheet(isPresented: $editingCategories) {
             CategoriesEditor()
         }
-        .sheet(item: $pendingImport) { pending in
+        .floatingSheet(item: $pendingImport) { pending in
             ImportPreview(pending: pending)
         }
         .fileImporter(
@@ -78,7 +78,7 @@ struct FinanceScreen: View {
         ) { result in
             if case .success(let url) = result { load(url) }
         }
-        .confirmationDialog(
+        .appConfirm(
             "Excluir lançamento?",
             isPresented: Binding(get: { deletingTransaction != nil }, set: { if !$0 { deletingTransaction = nil } }),
             titleVisibility: .visible,
@@ -213,7 +213,7 @@ private struct TransactionRow: View {
             Text(transaction.description)
                 .lineLimit(1)
             Spacer()
-            Menu {
+            PopupMenu {
                 Button("Sem categoria") { model.setCategory(nil, forTransaction: transaction.id) }
                 ForEach(model.data.financeCategories.filter { $0.isIncome == !transaction.isExpense }) { category in
                     Button(category.name) { model.setCategory(category.id, forTransaction: transaction.id) }
@@ -222,7 +222,7 @@ private struct TransactionRow: View {
                 Text(model.financeCategory(transaction.categoryID)?.name ?? "Categorizar")
                     .foregroundStyle(transaction.categoryID == nil ? Color.orange : Color.secondary)
             }
-            .menuStyle(.borderlessButton)
+            .buttonStyle(.plain)
             .fixedSize()
             Text(Finance.format(cents: transaction.amountCents))
                 .monospacedDigit()
@@ -235,7 +235,7 @@ private struct TransactionRow: View {
 
 private struct TransactionEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let transaction: MoneyTransaction?
     @State private var description: String
     @State private var amountText: String
@@ -256,22 +256,16 @@ private struct TransactionEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(transaction == nil ? "Novo lançamento" : "Editar lançamento").font(.headline)
-            Form {
-                Picker("Tipo", selection: $isExpense) {
-                    Text("Despesa").tag(true)
-                    Text("Receita").tag(false)
-                }
-                .pickerStyle(.segmented)
+            Text(transaction == nil ? "Novo lançamento" : "Editar lançamento").font(Theme.font(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                SegmentedTabs(options: [(true, "Despesa"), (false, "Receita")], selection: $isExpense)
                 TextField("Descrição", text: $description)
-                TextField("Valor (R$)", text: $amountText)
-                DatePicker("Data", selection: $date, displayedComponents: .date)
-                Picker("Categoria", selection: $categoryID) {
-                    Text("Sem categoria").tag(UUID?.none)
-                    ForEach(model.data.financeCategories.filter { $0.isIncome == !isExpense }) { category in
-                        Text(category.name).tag(Optional(category.id))
-                    }
-                }
+                LabeledContent("Valor (R$)") { TextField("0,00", text: $amountText).frame(width: 120) }
+                DateField("Data", selection: $date, displayedComponents: .date)
+                ChoicePicker("Categoria", selection: $categoryID, choices: [Choice(value: nil, title: "Sem categoria")]
+                    + model.data.financeCategories.filter { $0.isIncome == !isExpense }.map {
+                        Choice(value: Optional($0.id), title: $0.name, color: Color(hex: $0.colorHex))
+                    })
             }
             HStack {
                 if let transaction {
@@ -285,6 +279,7 @@ private struct TransactionEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(cents == nil || description.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -317,7 +312,7 @@ private struct TransactionEditor: View {
 
 private struct CategoriesEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     @State private var drafts: [CategoryDraft] = []
 
     struct CategoryDraft: Identifiable {
@@ -328,7 +323,7 @@ private struct CategoriesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Categorias e orçamento mensal").font(.headline)
+            Text("Categorias e orçamento mensal").font(Theme.font(size: 16, weight: .semibold))
             List {
                 Section("Despesas") {
                     ForEach(drafts.filter { $0.category.isIncome == false }) { draft in
@@ -364,6 +359,7 @@ private struct CategoriesEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
             }
         }
         .padding(20)
@@ -431,7 +427,7 @@ struct PendingImport: Identifiable {
 /// Shows what a statement will add before importing it.
 private struct ImportPreview: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let pending: PendingImport
     @State private var invertSigns = false
 
@@ -441,7 +437,7 @@ private struct ImportPreview: View {
         let preview = StatementImporter.newTransactions(from: lines, existing: model.data.transactions)
 
         VStack(alignment: .leading, spacing: 14) {
-            Text("Importar \(pending.fileName)").font(.headline)
+            Text("Importar \(pending.fileName)").font(Theme.font(size: 16, weight: .semibold))
 
             if case .failure(let error) = parsed {
                 Text(error.localizedDescription).foregroundStyle(.red)

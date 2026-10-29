@@ -75,9 +75,9 @@ struct AreaPage: View {
             .padding(.bottom, 40)
             .pageColumn()
         }
-        .sheet(isPresented: $editing) { ActivityEditor(activity: area) }
-        .sheet(item: $editingSession) { SessionEditor(session: $0) }
-        .sheet(isPresented: $addingSession) { SessionEditor(session: nil, activityID: area.id) }
+        .floatingSheet(isPresented: $editing) { ActivityEditor(activity: area) }
+        .floatingSheet(item: $editingSession) { SessionEditor(session: $0) }
+        .floatingSheet(isPresented: $addingSession) { SessionEditor(session: nil, activityID: area.id) }
     }
 
     private func update(_ change: (inout Activity) -> Void) {
@@ -117,7 +117,7 @@ struct SessionRow: View {
 
 struct SessionEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let session: FocusSession?
     @State private var activityID: UUID?
     @State private var start: Date
@@ -133,15 +133,13 @@ struct SessionEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(session == nil ? "Adicionar sessão" : "Editar sessão").font(.headline)
-            Form {
-                Picker("Atividade", selection: $activityID) {
-                    ForEach(choices) { activity in
-                        Text(activity.name).tag(Optional(activity.id))
-                    }
-                }
-                DatePicker("Início", selection: $start)
-                DatePicker("Fim", selection: $end)
+            Text(session == nil ? "Adicionar sessão" : "Editar sessão").font(Theme.font(size: 16, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                ChoicePicker("Atividade", selection: $activityID, choices: choices.map {
+                    Choice(value: Optional($0.id), title: $0.name, color: Color(hex: $0.colorHex))
+                })
+                DateField("Início", selection: $start)
+                DateField("Fim", selection: $end)
                 Text("Duração: \(DurationFormat.clock(max(0, end.timeIntervalSince(start))))")
                     .foregroundStyle(end > start ? Color.secondary : Color.red)
             }
@@ -157,6 +155,7 @@ struct SessionEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(activityID == nil || end <= start)
             }
         }

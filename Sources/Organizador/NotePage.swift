@@ -54,7 +54,7 @@ struct NotePage: View {
                 Button("Mover para o Lixo", systemImage: "trash") { confirmingTrash = true }
             }
         }
-        .confirmationDialog("Mover nota para o Lixo?", isPresented: $confirmingTrash, titleVisibility: .visible) {
+        .appConfirm("Mover nota para o Lixo?", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Mover para o Lixo", role: .destructive) {
                 library.trash(current)
                 model.route = .notes

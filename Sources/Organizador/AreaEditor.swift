@@ -4,7 +4,7 @@ import SwiftUI
 /// Name and color of a big area, like "Universidade".
 struct AreaEditor: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.closeSheet) private var dismiss
     let area: Area?
     var onSave: ((Area) -> Void)?
     @State private var name: String
@@ -19,15 +19,14 @@ struct AreaEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(area == nil ? "Nova área" : "Editar área").font(.headline)
+            Text(area == nil ? "Nova área" : "Editar área").font(Theme.font(size: 16, weight: .semibold))
             TextField("Nome", text: $name)
-                .textFieldStyle(.roundedBorder)
             HStack(spacing: 8) {
                 ForEach(Palette.colors, id: \.self) { hex in
                     Circle()
                         .fill(Color(hex: hex))
                         .frame(width: 24, height: 24)
-                        .overlay(Circle().stroke(Color.primary, lineWidth: hex == colorHex ? 2 : 0))
+                        .overlay(Circle().stroke(Theme.text, lineWidth: hex == colorHex ? 2 : 0))
                         .onTapGesture { colorHex = hex }
                 }
             }
@@ -37,6 +36,7 @@ struct AreaEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Salvar") { save() }
                     .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.heading(primary: true))
                     .disabled(trimmedName.isEmpty)
             }
         }
@@ -84,16 +84,16 @@ struct AreaSettings: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .contextMenu {
+                .appContextMenu {
                     Button("Editar") { editing = area }
                     Button("Apagar", role: .destructive) { deleting = area }
                 }
             }
             // Sheets hang off this one row: on a Section inside a Form they would be copied to every row.
             Button("Nova área") { adding = true }
-                .sheet(isPresented: $adding) { AreaEditor(area: nil) }
-                .sheet(item: $editing) { AreaEditor(area: $0) }
-                .confirmationDialog(
+                .floatingSheet(isPresented: $adding) { AreaEditor(area: nil) }
+                .floatingSheet(item: $editing) { AreaEditor(area: $0) }
+                .appConfirm(
                     deleting.map { "Apagar \($0.name)?" } ?? "",
                     isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                     titleVisibility: .visible,

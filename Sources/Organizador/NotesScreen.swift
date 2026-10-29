@@ -37,7 +37,7 @@ struct NotesScreen: View {
                 SegmentedTabs(options: Mode.allCases.map { ($0, $0.title) }, selection: $mode)
             }
         }
-        .confirmationDialog("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
+        .appConfirm("Mover nota para o Lixo?", isPresented: Binding(get: { trashingNote != nil }, set: { if !$0 { trashingNote = nil } }), titleVisibility: .visible, presenting: trashingNote) { note in
             Button("Mover para o Lixo", role: .destructive) { library.trash(note); trashingNote = nil }
         } message: { _ in Text("A nota será removida.") }
     }
@@ -69,7 +69,7 @@ struct NotesScreen: View {
                 VStack(spacing: 2) {
                     ForEach(notes) { note in
                         NoteRow(note: note, base: library.folder) { model.route = .note(note.url) }
-                            .contextMenu {
+                            .appContextMenu {
                                 Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
                                 Divider()
                                 Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
