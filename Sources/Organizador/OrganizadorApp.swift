@@ -1,6 +1,7 @@
 import AppKit
 import CoreText
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 import UserNotifications
 
@@ -25,6 +26,7 @@ struct OrganizadorApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environment(model)
+                .shadcnTheme(Theme.shadcn, glass: false)
         } label: {
             MenuBarLabel(model: model)
         }
@@ -33,6 +35,7 @@ struct OrganizadorApp: App {
         Settings {
             PreferencesView()
                 .environment(model)
+                .shadcnTheme(Theme.shadcn, glass: false)
         }
     }
 }

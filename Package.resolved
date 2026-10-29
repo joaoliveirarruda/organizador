@@ -1,0 +1,15 @@
+{
+  "originHash" : "513e912ee9f8e98aab68ee0161b5bcfdcf9eea0c62d329541bfd4a98d2b2ec61",
+  "pins" : [
+    {
+      "identity" : "shadkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jasonkneen/ShadKit",
+      "state" : {
+        "revision" : "f628b2003f5ae58e11b9a91481c3287c35e0fd1a",
+        "version" : "0.3.0"
+      }
+    }
+  ],
+  "version" : 3
+}

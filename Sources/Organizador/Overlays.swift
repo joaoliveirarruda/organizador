@@ -1,4 +1,5 @@
 import AppKit
+import ShadcnUI
 import SwiftUI
 
 /// The app's own floating layers, drawn over the main window in place of macOS sheets, menus,
@@ -86,9 +87,7 @@ struct OverlayHost: View {
                         .toggleStyle(RowToggleStyle())
                         .labeledContentStyle(RowLabeledContentStyle())
                         .scrollContentBackground(.hidden)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.sidebar))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
-                        .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
+                        .modifier(DialogChrome())
                         .padding(24)
                 }
                 .transition(.opacity)
@@ -117,6 +116,19 @@ struct OverlayHost: View {
     }
 }
 
+/// shadcn's dialog surface: `bg-background rounded-lg border shadow-lg`.
+private struct DialogChrome: ViewModifier {
+    @Environment(\.shadcnPalette) private var palette
+    @Environment(\.shadcnTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .background(RoundedRectangle(cornerRadius: theme.radius.lg, style: .continuous).fill(palette.background))
+            .shadcnBorder(palette.border, cornerRadius: theme.radius.lg)
+            .shadcnShadow(.lg)
+    }
+}
+
 /// The open list, under its control, or above it when there is no room below.
 private struct PopupLayer: View {
     let popup: Overlays.Popup
@@ -127,13 +139,8 @@ private struct PopupLayer: View {
             let bounds = space.frame(in: .global)
             ZStack(alignment: .topLeading) {
                 Color.clear.contentShape(Rectangle()).onTapGesture { Overlays.shared.closePopup() }
-                popup.content
+                ShadcnPanel { popup.content }
                     .font(Theme.font(size: 13))
-                    .foregroundStyle(Theme.text)
-                    .padding(4)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.sidebar))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border))
-                    .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
                     .fixedSize()
                     .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
                     .offset(origin(in: bounds))
@@ -330,9 +337,12 @@ private struct MenuItemStyle: PrimitiveButtonStyle {
     func makeBody(configuration: Configuration) -> some View { MenuItem(configuration: configuration) }
 }
 
+/// Drawn like `ShadcnMenuItem`, which only takes a string title, not an arbitrary label.
 private struct MenuItem: View {
     let configuration: PrimitiveButtonStyleConfiguration
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.shadcnPalette) private var palette
+    @Environment(\.shadcnTheme) private var theme
     @State private var hovering = false
 
     var body: some View {
@@ -342,11 +352,11 @@ private struct MenuItem: View {
         } label: {
             configuration.label
                 .lineLimit(1)
-                .foregroundStyle(configuration.role == .destructive ? Theme.danger : Theme.text)
+                .foregroundStyle(configuration.role == .destructive ? palette.destructive : palette.popoverForeground)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 5).fill(hovering && isEnabled ? Theme.hover : .clear))
+                .padding(.horizontal, Space.x2)
+                .padding(.vertical, Space.x1_5)
+                .background(RoundedRectangle(cornerRadius: theme.radius.sm, style: .continuous).fill(hovering && isEnabled ? palette.accent : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

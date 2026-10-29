@@ -1,3 +1,5 @@
+import AppKit
+import ShadcnUI
 import SwiftUI
 
 /// One option of a `ChoicePicker`.
@@ -7,7 +9,7 @@ struct Choice<Value: Hashable> {
     var color: Color? = nil
 }
 
-/// Picks one of a few values from the app's own floating list. Replaces `Picker`.
+/// Picks one of a few values from a shadcn select. Replaces `Picker`.
 struct ChoicePicker<Value: Hashable>: View {
     let title: String
     @Binding var selection: Value
@@ -28,48 +30,24 @@ struct ChoicePicker<Value: Hashable>: View {
     }
 
     private var button: some View {
-        let current = choices.first { $0.value == selection }
-        return PopupButton {
-            ChoiceList(choices: choices, selection: $selection)
-        } label: {
-            HStack(spacing: 6) {
-                if let color = current?.color { Circle().fill(color).frame(width: 8, height: 8) }
-                Text(current?.title ?? "Escolha…").lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryText)
-            }
-            .fieldChrome()
-        }
-        .buttonStyle(.plain)
+        ShadcnSelect(
+            "Escolha…",
+            selection: Binding(get: { selection }, set: { if let value = $0 { selection = value } }),
+            isCompact: true,
+            maxVisibleRows: 10,
+            options: choices.map { ShadcnSelectOption(value: $0.value, label: $0.title, image: $0.color.map(dot)) }
+        )
+        .fixedSize()
     }
-}
 
-private struct ChoiceList<Value: Hashable>: View {
-    let choices: [Choice<Value>]
-    @Binding var selection: Value
-
-    var body: some View {
-        let list = MenuList {
-            ForEach(choices.indices, id: \.self) { index in
-                let choice = choices[index]
-                Button { selection = choice.value } label: {
-                    HStack(spacing: 8) {
-                        if let color = choice.color { Circle().fill(color).frame(width: 8, height: 8) }
-                        Text(choice.title)
-                        Spacer(minLength: 16)
-                        if choice.value == selection {
-                            Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold))
-                        }
-                    }
-                }
-            }
+    /// A colored circle the select draws as-is; SF Symbols would take the text color.
+    private func dot(_ color: Color) -> Image {
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
+            NSColor(color).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 4, dy: 4)).fill()
+            return true
         }
-        if choices.count > 10 {
-            ScrollView { list }.frame(height: 300)
-        } else {
-            list
-        }
+        return Image(nsImage: image)
     }
 }
 
@@ -140,8 +118,7 @@ private struct CalendarPanel: View {
             }
             HStack {
                 Button("Hoje") { pick(Date()) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.secondaryText)
+                    .buttonStyle(.shadcn(.ghost, size: .xs))
                 Spacer()
                 if withTime {
                     TextField("00:00", text: $time)
@@ -159,9 +136,9 @@ private struct CalendarPanel: View {
         Button {
             month = calendar.date(byAdding: .month, value: months, to: month) ?? month
         } label: {
-            Image(systemName: symbol).frame(width: 24, height: 24).contentShape(Rectangle())
+            Image(systemName: symbol)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.shadcn(.ghost, size: .iconXS))
     }
 
     /// Short weekday names starting on the calendar's first day of the week.
@@ -236,12 +213,11 @@ struct NumberStepper: View {
 
     var body: some View {
         LabeledContent(title) {
-            HStack(spacing: 0) {
+            ShadcnButtonGroup {
                 button("minus", -step).disabled(value <= range.lowerBound)
-                Rectangle().fill(Theme.border).frame(width: 1, height: 14)
+                ShadcnSeparator(.vertical).frame(height: 14)
                 button("plus", step).disabled(value >= range.upperBound)
             }
-            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.hover))
         }
     }
 
@@ -250,11 +226,8 @@ struct NumberStepper: View {
             value = min(max(value + delta, range.lowerBound), range.upperBound)
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 10, weight: .semibold))
-                .frame(width: 28, height: 26)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.shadcn(.ghost, size: .iconXS))
     }
 }
 
@@ -279,25 +252,17 @@ struct FormSection<Content: View>: View {
     }
 }
 
-/// A switch drawn by the app, with its label on the left and the switch at the far right.
+/// A shadcn switch, with its label on the left and the switch at the far right.
 struct RowToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
-        Button { configuration.isOn.toggle() } label: {
-            HStack(spacing: 12) {
-                configuration.label
-                Spacer(minLength: 0)
-                Capsule()
-                    .fill(configuration.isOn ? Theme.accent : Theme.border)
-                    .frame(width: 30, height: 18)
-                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle().fill(configuration.isOn ? Theme.onAccent : Theme.text).padding(3)
-                    }
-                    .animation(.easeOut(duration: 0.12), value: configuration.isOn)
-            }
-            .frame(minHeight: 28)
-            .contentShape(Rectangle())
+        HStack(spacing: 12) {
+            configuration.label
+            Spacer(minLength: 0)
+            ShadcnSwitch(isOn: configuration.$isOn)
         }
-        .buttonStyle(.plain)
+        .frame(minHeight: 28)
+        .contentShape(Rectangle())
+        .onTapGesture { configuration.isOn.toggle() }
     }
 }
 
@@ -317,18 +282,28 @@ struct AppFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .textFieldStyle(.plain)
-            .padding(.horizontal, 8)
             .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.hover))
+            .fieldChrome()
+    }
+}
+
+/// shadcn's input box: `border-input bg-input/30 rounded-md px-3 shadow-xs`.
+private struct InputChrome: ViewModifier {
+    @Environment(\.shadcnPalette) private var palette
+    @Environment(\.shadcnTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, Space.x3)
+            .frame(minHeight: 28)
+            .background(RoundedRectangle(cornerRadius: theme.radius.md, style: .continuous).fill(palette.input.opacity(0.3)))
+            .shadcnBorder(palette.input, cornerRadius: theme.radius.md)
+            .shadcnShadow(.xs)
+            .contentShape(Rectangle())
     }
 }
 
 extension View {
     /// The rounded box around a field's value.
-    func fieldChrome() -> some View {
-        padding(.horizontal, 8)
-            .frame(minHeight: 26)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Theme.hover))
-            .contentShape(Rectangle())
-    }
+    func fieldChrome() -> some View { modifier(InputChrome()) }
 }
