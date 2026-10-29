@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// A note opened as a page: icon and cover (kept in the file's front matter), the page it was created under,
@@ -23,7 +24,7 @@ struct NotePage: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let parent = meta.parent {
                         Button(parent, systemImage: "arrow.turn.left.up") { model.open(link: parent) }
-                            .buttonStyle(.link)
+                            .buttonStyle(.shadcn(.link, size: .xs, hasIcon: true))
                             .font(.callout)
                     }
                     TitleField(note: note)
@@ -121,13 +122,13 @@ struct Backlinks: View {
     var body: some View {
         let backlinks = NoteGraph.backlinks(to: note.title, in: notes)
         if !backlinks.isEmpty {
-            Divider()
+            ShadcnSeparator()
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack {
                     Text("Mencionada em").foregroundStyle(.secondary)
                     ForEach(backlinks) { backlink in
                         Button(backlink.title) { onOpen(backlink) }
-                            .buttonStyle(.link)
+                            .buttonStyle(.shadcn(.link, size: .xs, hasIcon: true))
                     }
                 }
                 .font(.callout)

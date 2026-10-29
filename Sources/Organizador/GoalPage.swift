@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// An objective opened as a project: progress, the timer button, where you left off,
@@ -114,7 +115,7 @@ struct GoalPage: View {
             stat("Progresso") {
                 if let target = progress.targetSeconds, let fraction = progress.fraction {
                     Text("\(DurationFormat.short(progress.loggedSeconds)) de \(DurationFormat.short(target))")
-                    ProgressView(value: fraction).tint(progress.isComplete ? .green : Theme.accent).frame(width: 160)
+                    ShadcnProgress(value: fraction).shadcnTint(progress.isComplete ? .green : Theme.accent).frame(width: 160)
                 } else {
                     Text(DurationFormat.short(progress.loggedSeconds))
                 }
@@ -132,7 +133,7 @@ struct GoalPage: View {
             stat("Nesta semana") {
                 if let intended = thread.weeklyTargetSeconds {
                     Text("\(DurationFormat.short(thread.weekSeconds)) de \(DurationFormat.short(intended)) pretendidas")
-                    ProgressView(value: min(1, thread.weekSeconds / intended)).tint(Theme.accent).frame(width: 160)
+                    ShadcnProgress(value: min(1, thread.weekSeconds / intended)).frame(width: 160)
                 } else {
                     Text(DurationFormat.short(thread.weekSeconds))
                 }
@@ -196,7 +197,7 @@ struct GoalPage: View {
             Button("Nova nota", systemImage: "plus") {
                 if let note = model.notes.create(body: "[[\(goal.title)]]\n\n") { model.route = .note(note.url) }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.heading())
         }
     }
 
@@ -208,7 +209,7 @@ struct GoalPage: View {
             ForEach(open) { TaskRow(task: $0) }
             ForEach(Array(done)) { TaskRow(task: $0) }
             TextField("Nova tarefa (Enter para adicionar)", text: $newTask)
-                .textFieldStyle(.plain)
+                .textFieldStyle(AppFieldStyle())
                 .onSubmit {
                     let title = newTask.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !title.isEmpty else { return }
@@ -251,7 +252,7 @@ struct GoalPage: View {
             }
         } accessory: {
             Button("Nova atividade", systemImage: "plus") { addingArea = true }
-                .buttonStyle(.borderless)
+                .buttonStyle(.heading())
         }
     }
 }
@@ -266,10 +267,12 @@ private struct StateBadge: View {
         case .paused: ("pausado", .gray)
         case .closed: ("encerrado", .gray)
         }
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8).padding(.vertical, 2)
-            .background(Capsule().fill(color.opacity(0.18)))
+        ShadcnBadge(variant: .outline) {
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 6, height: 6)
+                Text(text)
+            }
+        }
     }
 }
 

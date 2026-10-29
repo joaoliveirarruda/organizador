@@ -1,5 +1,6 @@
 import AppKit
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 /// Every note, with search, and the graph of connections between them. A note opens as its own page.
@@ -56,8 +57,8 @@ struct NotesScreen: View {
                     TextField("Buscar por título ou conteúdo", text: $search)
                         .textFieldStyle(.plain)
                         .font(Theme.font(size: 14))
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.card))
+                        .padding(.vertical, 8)
+                        .fieldChrome()
                 }
                 if library.notes.isEmpty {
                     Text("Nenhuma nota ainda. Crie a primeira com o botão acima ou ⌘N.")
@@ -71,7 +72,7 @@ struct NotesScreen: View {
                         NoteRow(note: note, base: library.folder) { model.route = .note(note.url) }
                             .appContextMenu {
                                 Button("Mostrar no Finder") { NSWorkspace.shared.activateFileViewerSelecting([note.url]) }
-                                Divider()
+                                ShadcnMenuSeparator()
                                 Button("Mover para o Lixo", role: .destructive) { trashingNote = note }
                             }
                     }

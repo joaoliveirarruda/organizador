@@ -1,4 +1,5 @@
 import OrganizadorCore
+import ShadcnUI
 import SwiftUI
 
 struct HabitsScreen: View {
@@ -56,8 +57,9 @@ struct HabitCard: View {
 
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: doneToday ? "checkmark.circle.fill" : "circle")
-                    .font(.title3).foregroundStyle(color)
+                ShadcnCheckbox(isChecked: Binding(get: { doneToday }, set: { _ in model.toggleHabit(habit.id, on: now) }))
+                    .shadcnTint(color)
+                    .disabled(onlyByTimer)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(habit.name).font(.title3.weight(.semibold))
@@ -79,24 +81,24 @@ struct HabitCard: View {
                 Button(action: onEdit) {
                     Image(systemName: "pencil")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.shadcn(.ghost, size: .iconSM))
                 .help("Editar hábito")
             }
 
             Text(subtitle).font(Theme.font(size: 12)).foregroundStyle(Theme.secondaryText)
             HStack(spacing: 16) {
                 Button(doneToday ? "Desmarcar hoje" : "Marcar hoje") { model.toggleHabit(habit.id, on: now) }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.heading())
                     .disabled(onlyByTimer)
-                Button("Ver constância   ›") { showingConsistency = true }.buttonStyle(.plain)
+                Button("Ver constância   ›") { showingConsistency = true }.buttonStyle(.shadcn(.ghost, size: .small))
                 if onlyByTimer, let activityID = habit.autoActivityID {
-                    Button("Ver origem da marcação   ›") { model.route = .area(activityID) }.buttonStyle(.plain)
+                    Button("Ver origem da marcação   ›") { model.route = .area(activityID) }.buttonStyle(.shadcn(.ghost, size: .small))
                 }
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+        .cardChrome()
         .appContextMenu {
             Button("Editar", action: onEdit)
         }
